@@ -1,0 +1,4 @@
+allowBuilds:
+  esbuild: set this to true or false
+overrides:
+  "@electron/node-gyp": "npm:@electron/node-gyp@10.2.0-electron.2"

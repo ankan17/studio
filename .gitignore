@@ -1,0 +1,11 @@
+node_modules
+out
+dist
+.vite
+.DS_Store
+.env
+*.tsbuildinfo
+*.mp4
+*.MP4
+*.mov
+.claude/
