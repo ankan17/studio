@@ -16,8 +16,9 @@ The spike repo is `ankan17/studio-spike`; its findings are copied into `docs/`.
 Full figures and caveats: `docs/spike-results.md`, `docs/spike-decisions.md`.
 
 ## Layout
-- `apps/desktop`: Electron Forge + Vite + React + Tailwind app. `src/main.ts` (window, IPC, security settings), `src/preload.ts` (typed `window.studio` API from `src/ipc.ts`), `src/media-protocol.ts` (hardened `media://` with Range), `src/memory-sampler.ts` and `src/Hud.tsx` (memory HUD), `src/App.tsx` (open a video, preview it in the Remotion Player).
-- `packages/schema`: Zod project schema (`@studio/schema`): integer frames for the timeline, integer microseconds for source offsets, assets manifest, transitions as a property of the gap between clips.
+- `apps/desktop`: Electron Forge + Vite + React + Tailwind app. `src/main.ts` (window, IPC, security settings), `src/preload.ts` (typed `window.studio` API from `src/ipc.ts`), `src/media-protocol.ts` (hardened `media://` with Range), `src/memory-sampler.ts` and `src/Hud.tsx` (memory HUD), `src/editorStore.ts` (zustand + immer, 800ms debounced autosave, flush on close and on window close), `src/Dashboard.tsx` (recent projects, new project with format and fps picker, rename, duplicate, delete, thumbnails), `src/Editor.tsx` (project shell with save status, a video preview and a set-thumbnail button). Every IPC request is Zod-validated in main (`src/ipc.ts`).
+- `packages/schema`: Zod project schema v1 (`@studio/schema`): integer frames for the timeline, integer microseconds for source offsets, assets manifest, tracks, clips (transform, crop, fit, volume, fades, text), markers, format presets, a migration scaffold (`migrateProject`) and `convertProjectFps` (fps change on duplicate converts positions through time).
+- `packages/project-store`: Node-only project folder manager (`@studio/project-store`). Layout under the app data folder `projects/` (override with `STUDIO_PROJECTS_DIR`): `index.json` (rebuildable mirror), `<uuid>/project.json` (source of truth), `project.json.prev`, `recovery/<ms>.json` (snapshots, newest 10), `assets/`, `cache/`, `thumbnail.jpg`. Saves are atomic (temp file, fsync, rename), all mutations are serialised, ids must be UUIDs, delete moves to the Trash. Opening falls back to the newest valid snapshot, then `.prev`, if `project.json` is damaged.
 - `scripts/summarize-run.py`: summarises a memory CSV (settled baseline, peak, per-process growth).
 
 ## Run
@@ -25,6 +26,8 @@ Full figures and caveats: `docs/spike-results.md`, `docs/spike-decisions.md`.
 pnpm install            # needs the @electron/node-gyp override in pnpm-workspace.yaml; the esbuild ignored-builds warning is harmless
 pnpm dev                # electron-forge start in apps/desktop; keep stdin open when scripting: npx electron-forge start < <(sleep 1700)
 pnpm typecheck
+pnpm lint
+pnpm test                # schema tests, store tests, and a SIGKILL-mid-save crash test
 ```
 
 ## Security lessons (from the spike review) and where they are applied
@@ -40,3 +43,8 @@ pnpm typecheck
 - Do not add `remotion` to Vite `optimizeDeps.include`; do pre-include `@remotion/transitions` and `@remotion/fonts`, and set `resolve.dedupe` for react.
 - Fonts: Noto Sans Bengali and Bebas Neue (SIL OFL) are in the spike repo `spike/fonts/`.
 - Memory bars apply to the 8GB Mac: editor tab under 600MB, total under 1.2GB, export peak under 1.5GB.
+
+## M1 status
+Done: monorepo, Forge + Vite + sandboxed renderer, Zod-validated typed IPC, hardened `media://`, schema v1 with validators and migration scaffold, project folder manager, atomic save, recovery snapshots, debounced autosave, dashboard, memory HUD.
+M1 exit check: the crash test SIGKILLs a writer at random moments 12 times and the project always reopens; an end-to-end run in the real app covered create, edit, autosave, reopen, duplicate and rejected bad input.
+Not covered yet: dashboard thumbnails are only set manually (button in the editor) until there are clips to take a frame from (M2).

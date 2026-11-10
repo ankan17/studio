@@ -1,0 +1,11 @@
+{
+  "name": "@studio/project-store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {"typecheck": "tsc --noEmit", "test": "vitest run"},
+  "dependencies": {"@studio/schema": "workspace:*"},
+  "devDependencies": {"@types/node": "20.12.14", "typescript": "5.9.3"}
+}

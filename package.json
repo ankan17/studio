@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "pnpm --filter @studio/desktop start",
     "typecheck": "turbo run typecheck",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "test": "turbo run test"
   },
   "devDependencies": {
     "turbo": "^2.5.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^3.2.0",
+    "tsx": "^4.20.0"
   }
 }

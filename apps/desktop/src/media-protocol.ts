@@ -54,9 +54,12 @@ export function handleMediaProtocol(): void {
       return new Response("Not found", {status: 404});
     }
     if (![...roots].some((r) => file.startsWith(r))) return new Response("Forbidden", {status: 403});
+    // Only media types are served, so project.json and index.json are not readable through media://.
+    const mime = MIME[path.extname(file).toLowerCase()];
+    if (!mime) return new Response("Forbidden", {status: 403});
     const stat = await fs.promises.stat(file);
     if (!stat.isFile()) return new Response("Not found", {status: 404});
-    const base = {"Content-Type": MIME[path.extname(file).toLowerCase()] ?? "application/octet-stream", "Accept-Ranges": "bytes"};
+    const base = {"Content-Type": mime, "Accept-Ranges": "bytes"};
     const range = request.headers.get("range");
     if (!range) {
       return new Response(Readable.toWeb(fs.createReadStream(file)) as ReadableStream, {
