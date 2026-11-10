@@ -1,0 +1,48 @@
+{
+  "name": "@studio/desktop",
+  "productName": "Studio",
+  "version": "0.0.0",
+  "private": true,
+  "main": ".vite/build/main.js",
+  "engines": {"node": "^20.19.0 || ^22.13.0 || >=24"},
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ignore-pattern .vite --ignore-pattern out"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@mediabunny/aac-encoder": "1.64.0",
+    "@mediabunny/flac-encoder": "1.64.0",
+    "@mediabunny/mp3-encoder": "1.64.0",
+    "@remotion/fonts": "4.0.542",
+    "@remotion/media": "4.0.542",
+    "@remotion/player": "4.0.542",
+    "@remotion/transitions": "4.0.542",
+    "@remotion/web-renderer": "4.0.542",
+    "@studio/schema": "workspace:*",
+    "mediabunny": "1.64.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.542",
+    "scheduler": "0.27.0"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "7.11.1",
+    "@electron-forge/plugin-vite": "7.11.1",
+    "@remotion/eslint-config-flat": "4.0.542",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "20.12.14",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/web": "0.0.166",
+    "@vitejs/plugin-react": "4.3.4",
+    "electron": "42.11.16",
+    "eslint": "10.12.0",
+    "prettier": "3.8.1",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3",
+    "vite": "6.4.5"
+  }
+}

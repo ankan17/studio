@@ -2,6 +2,7 @@ node_modules
 out
 dist
 .vite
+.turbo
 .DS_Store
 .env
 *.tsbuildinfo

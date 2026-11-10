@@ -15,18 +15,23 @@ The spike repo is `ankan17/studio-spike`; its findings are copied into `docs/`.
 
 Full figures and caveats: `docs/spike-results.md`, `docs/spike-decisions.md`.
 
-## Carry-over from the spike (`carry-over/`)
-- `media-protocol.ts`: `media://` protocol with Range support and path allow-list. Before use, harden it (see below).
-- `memory-sampler.ts`: `app.getAppMetrics()` sampler with CSV log.
-- `hud-snippet.tsx.txt`: the overlay HUD markup from the spike UI.
-- `summarize-run.py`: summarises a memory CSV (settled baseline, peak, per-process growth).
-- `pnpm-workspace.yaml`: the `@electron/node-gyp` override that makes `pnpm install` work with the template. Do not set `blockExoticSubdeps: false`.
+## Layout
+- `apps/desktop`: Electron Forge + Vite + React + Tailwind app. `src/main.ts` (window, IPC, security settings), `src/preload.ts` (typed `window.studio` API from `src/ipc.ts`), `src/media-protocol.ts` (hardened `media://` with Range), `src/memory-sampler.ts` and `src/Hud.tsx` (memory HUD), `src/App.tsx` (open a video, preview it in the Remotion Player).
+- `packages/schema`: Zod project schema (`@studio/schema`): integer frames for the timeline, integer microseconds for source offsets, assets manifest, transitions as a property of the gap between clips.
+- `scripts/summarize-run.py`: summarises a memory CSV (settled baseline, peak, per-process growth).
 
-## Security lessons to apply in M1 (from the spike review)
-- Main picks output paths via a save dialog; the renderer never supplies a path.
-- Check sender origin/frame URL on every IPC handler, add `will-navigate` and window-open guards, enable `sandbox: true`.
-- Resolve symlinks (`realpath`) in the `media://` allow-list; return 416 for bad `bytes=-N` ranges.
-- Remove autorun env vars and wide `localhost:*` CSP from production builds.
+## Run
+```
+pnpm install            # needs the @electron/node-gyp override in pnpm-workspace.yaml; the esbuild ignored-builds warning is harmless
+pnpm dev                # electron-forge start in apps/desktop; keep stdin open when scripting: npx electron-forge start < <(sleep 1700)
+pnpm typecheck
+```
+
+## Security lessons (from the spike review) and where they are applied
+- Main picks paths via native dialogs; the renderer never supplies a path (`openMedia` does this; do the same for export).
+- Done in `main.ts`: `assertTrusted` checks the top frame on every handler, `will-navigate` and window-open guards, `sandbox: true`, permission requests denied. Keep calling `assertTrusted` in every new handler.
+- Done in `media-protocol.ts`: realpath-based allow-list of folders added by main, 416 for bad ranges.
+- Still to do: tighten the CSP for production builds (`localhost:*` is only for the dev server).
 
 ## Setup notes
 - Pin all `remotion` and `@remotion/*` to one exact version (spike used 4.0.542) and `mediabunny` to 1.64.0.
