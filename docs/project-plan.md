@@ -33,7 +33,7 @@ V1 is done when one person can take 10 phone-recorded clips, cut a 2 to 3 minute
 - Timeline: multiple video and audio tracks, move, trim, split, duplicate, delete, snapping, zoom, multi-select, undo and redo
 - Clips: speed 0.5x to 2x, crop, scale, position, rotation, opacity, flip, fit mode, volume, mute, fade in and out
 - Text: content, font, size, colour, alignment, background, stroke, shadow, a small set of entrance and exit presets
-- Transitions: cut, fade, dissolve between adjacent clips
+- Transitions: cut, fade, dissolve between adjacent clips (spike 5: the shader dissolve needs Chrome 149 and Electron has 148, so V1 uses the non-shader cross-fade and true dissolve waits for a newer Electron)
 - Preview: Remotion Player, play, seek, frame step, canvas drag to position, aspect ratios 16:9, 9:16, 4:5, 1:1
 - Export: MP4 H.264 with AAC at 720p or 1080p, 24, 25, 30 or 60 fps, progress and cancel
 - Business Studio: product record, brand kit, three promotional templates with auto-filled title, price and brand
@@ -134,7 +134,7 @@ The budget is measured on the 8GB Apple Silicon Mac the vlogs are edited on with
 **Levers, each tied to a milestone**
 
 - Proxies by default for any source above 1920x1080 or above 30fps, at 720p H.264 constant frame rate. The export reads originals. (M2)
-- Decoded frame cache capped with `mediaCacheSizeInBytes` per window, around 200MB for the editor and 300MB for the render window. (M3, M6)
+- Decoded frame cache capped with `mediaCacheSizeInBytes` per window, around 240MB for the editor (Remotion's minimum; a lower value makes the player fall back to a native video tag) and 300MB for the render window. (M3, M6)
 - Only clips within 2 seconds of the playhead are mounted, using Sequence premount. Everything else is unmounted, not hidden. (M3)
 - Filmstrip thumbnails as JPEG sprite strips on disk, loaded per visible timeline viewport and evicted on scroll. (M2, M4)
 - Waveforms as 8-bit peak files on disk, one sample per 10ms, drawn on canvas. (M2)
@@ -146,9 +146,11 @@ The budget is measured on the 8GB Apple Silicon Mac the vlogs are edited on with
 
 Memory from decoded video dominates every figure above. One decoded 4K frame is 33MB and one 720p frame 2.7MB, which is why proxies are a default and not a setting.
 
+Measured in the spike on the 8GB Mac (Nov 10): three-layer playback used 396MB in the editor window and 741MB in total; the 2-minute 1080p web export peaked at 1.11GB; main-process growth while making proxies was 35 to 51MB, so one clip missed the 50MB bar by 1MB. Other apps were open during these runs.
+
 ## Phase 0: spike
 
-The spike settles the three decisions that would otherwise force a rewrite: whether the web renderer is enough, whether Remotion's DOM preview is fast enough, and whether phone footage needs normalising at import. It is one throwaway repo built from the official Remotion Electron template.
+The spike settles the three decisions that would otherwise force a rewrite: whether the web renderer is enough, whether Remotion's DOM preview is fast enough, and whether phone footage needs normalising at import. It is one throwaway repo built from the official Remotion Electron template. Status Nov 10: all seven experiments were rerun on the 8GB Mac, and all three decisions hold there: the web renderer, the Remotion DOM compositor and no separate normalise step (the proxy step already converts HDR to SDR). Details are in the Phase 0 implementation tab.
 
 | # | Experiment | Pass | Fail action |
 | --- | --- | --- | --- |
