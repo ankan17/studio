@@ -47,6 +47,7 @@ export const history = new History();
 const LABELS: Record<Command["type"], string> = {
   addAsset: "Add clip", moveClips: "Move", trimClip: "Trim", splitClips: "Split", deleteClips: "Delete", duplicateClips: "Duplicate",
   updateClip: "Clip change", addTrack: "Add track", deleteTrack: "Delete track", moveTrack: "Reorder tracks", setTrack: "Track change", setProject: "Project change",
+  setSpeed: "Speed", setTransition: "Transition", addText: "Add title", updateText: "Title change", detachAudio: "Detach audio", addMarker: "Add marker", updateMarker: "Marker change", deleteMarker: "Delete marker",
 };
 
 /** Selection without clips that no longer exist (after a delete, an undo or a redo). */

@@ -339,6 +339,54 @@ def main():
         s.shot("canvas-selected", "Clicking the picture selects the clip under the playhead: gold box on the preview, the clip outlined on the timeline, its inspector open.")
         page.keyboard.press("Escape")
 
+        # ---- M5 editing: a dissolve, a named marker, a title, crop mode. All undone afterwards, so later shots are unchanged.
+        h_m5 = page.evaluate("() => window.__e2e.history().size")
+        v = next(t for t in proj()["tracks"] if t["type"] == "video")["clips"]
+        dispatch = lambda c: page.evaluate("(c) => window.__e2e.dispatch(c)", c)
+        # leave 15 frames of untrimmed footage each side of the V1 cut and close the gap (the timeline's own commands)
+        dispatch({"type": "trimClip", "clipId": v[0]["id"], "edge": "end", "deltaFrames": -15})
+        dispatch({"type": "trimClip", "clipId": v[1]["id"], "edge": "start", "deltaFrames": 15})
+        dispatch({"type": "moveClips", "clipIds": [v[1]["id"]], "deltaFrames": -30})
+        page.locator(f"[data-clip='{v[0]['id']}']").click(position={"x": 20, "y": 30})
+        page.click("[aria-label=Transition] button:has-text('Dissolve')")
+        focus_body()
+        page.keyboard.press("Home")
+        page.keyboard.press("Shift+ArrowRight")
+        page.keyboard.press("m")
+        page.locator("[data-testid=marker]").first.dblclick()
+        page.fill("input[aria-label='Marker name']", "Intro")
+        page.keyboard.press("Enter")
+        focus_body()
+        page.keyboard.press("t")
+        page.fill("textarea[aria-label='Title text']", "নমস্কার\nWelcome back")
+        page.click("[aria-label=Box] button:text-is('On')")
+        page.fill("#insp-color", "#ffd34d")
+        page.select_option("#insp-enterPreset", "slideUp")
+        focus_body()
+        page.keyboard.press("Shift+ArrowRight")  # one second into the title, past its entrance
+        page.mouse.move(W - 2, H - 2)
+        page.wait_for_selector("[data-testid=canvas-box]")
+        page.evaluate("() => document.querySelector('[data-testid=inspector] h3 + textarea').parentElement.scrollIntoView({block: 'start'})")  # the Text section at the top
+        wait_until(painted, 20)
+        s.shot("title-selected", "A title (Bengali and English, box, gold text) selected: outlined on the picture, on its own T1 track, its text controls in the inspector.")
+        s.shot("inspector-title", "Inspector for a title: text, font, size, colour, alignment, box, outline, shadow, enter and exit animations.", element="[data-testid=inspector]")
+        page.keyboard.press("Escape")
+        s.shot("timeline-m5", "Timeline close-up: a title on a T track, a dissolve centred on the V1 cut, the named marker Intro on the ruler.", element="[data-testid=sequence]")
+        page.locator(f"[data-clip='{v[0]['id']}']").click(position={"x": 20, "y": 30})
+        page.click("button:has-text('Crop on picture')")
+        page.fill("#insp-crop-left", "20")
+        page.fill("#insp-crop-bottom", "10")
+        page.mouse.move(W - 2, H - 2)
+        wait_until(painted, 20)
+        s.shot("canvas-crop", "Crop mode: the whole picture with the kept part outlined (thirds, eight handles), the rest dimmed; the crop fields in the inspector.")
+        page.click("button:has-text('Done')")
+        focus_body()
+        for _ in range(60):
+            if page.evaluate("() => window.__e2e.history().size") <= h_m5:
+                break
+            page.keyboard.press("Meta+z")
+        page.keyboard.press("Escape")
+
         # ---- dashboard with a project, hover
         page.click("button:has-text('Projects')")
         page.wait_for_selector("[aria-label^='Open ']")

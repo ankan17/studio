@@ -1,12 +1,14 @@
 // Editing actions shared by the timeline toolbar, its context menus and the keyboard, so each does the same thing
 // wherever it is triggered. They turn the selection and the playhead into commands for the editor store.
-import {locate} from "@studio/editor-core";
+import {locate, transitionRoom} from "@studio/editor-core";
+import type {TransitionKind} from "@studio/schema";
 import {clipsAtFrame} from "@studio/schema";
 import {create} from "zustand";
 import {useEditor} from "./editorStore";
 import {usePlayback} from "./playback";
 
 const ed = () => useEditor.getState();
+const TITLE_SECONDS = 3;
 const newIds = (ids: string[]) => Object.fromEntries(ids.map((id) => [id, crypto.randomUUID()]));
 
 export const edits = {
@@ -37,9 +39,55 @@ export const edits = {
     select(Object.values(ids)); // the copies are selected, ready to move
     return true;
   },
+  /** Put the selected video clip's sound on an audio track and mute the video. */
+  detachAudio(): boolean {
+    const {selection, dispatch, select} = ed();
+    if (selection.length !== 1) return false;
+    const id = crypto.randomUUID();
+    if (!dispatch({type: "detachAudio", clipId: selection[0]!, newClipId: id, trackId: crypto.randomUUID()})) return false;
+    select([id]); // the new sound clip, ready to move or adjust
+    return true;
+  },
+  /** A three-second title at the playhead, selected so the inspector shows its text. */
+  addText(): boolean {
+    const {project, dispatch, select} = ed();
+    if (!project) return false;
+    const id = crypto.randomUUID();
+    const frame = usePlayback.getState().frame;
+    if (!dispatch({type: "addText", clipId: id, trackId: crypto.randomUUID(), startFrame: frame, durationInFrames: Math.round(TITLE_SECONDS * project.fps), content: "Title"})) return false;
+    select([id]);
+    return true;
+  },
+  /** A transition from the selected clip into the next one (half a second, or as long as the cut allows), or none. */
+  setTransition(kind: TransitionKind | null, clipId = ed().selection[0]): boolean {
+    const {project, dispatch} = ed();
+    if (!project || !clipId) return false;
+    // eslint-disable-next-line @remotion/non-pure-animation -- a command field named "transition", not CSS
+    if (kind === null) return dispatch({type: "setTransition", clipId, transition: null});
+    const room = transitionRoom(project, clipId);
+    if (room.reason) {
+      useEditor.setState({refusal: room.reason});
+      return false;
+    }
+    const current = locate(project, clipId)?.clip.transitionOut?.durationInFrames;
+    const d = Math.min(room.max, current ?? Math.round(project.fps / 2));
+    // eslint-disable-next-line @remotion/non-pure-animation -- a command field named "transition", not CSS
+    return dispatch({type: "setTransition", clipId, transition: {kind, durationInFrames: d}});
+  },
   selectAll(): void {
     const {project, select} = ed();
     if (project) select(project.tracks.flatMap((t) => t.clips.map((c) => c.id)));
+  },
+  /** A marker at the playhead, unnamed; double-click it on the ruler to name it. */
+  addMarker(): boolean {
+    const {project, dispatch} = ed();
+    if (!project) return false;
+    const frame = usePlayback.getState().frame;
+    if (project.markers.some((m) => m.frame === frame)) {
+      useEditor.setState({refusal: "There is already a marker here"});
+      return false;
+    }
+    return dispatch({type: "addMarker", markerId: crypto.randomUUID(), frame, label: ""});
   },
   addTrack(kind: "video" | "audio"): void {
     ed().dispatch({type: "addTrack", trackId: crypto.randomUUID(), kind});

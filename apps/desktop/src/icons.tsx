@@ -41,5 +41,7 @@ export const Unlock = ({size = 16}: P) => base(<><rect x="5.5" y="10.5" width="1
 export const Eye = ({size = 16}: P) => base(<><path d="M3 12s3.3-6 9-6 9 6 9 6-3.3 6-9 6-9-6-9-6Z" /><circle cx="12" cy="12" r="2.5" /></>, size);
 export const EyeOff = ({size = 16}: P) => base(<><path d="M9.9 6.3A9.6 9.6 0 0 1 12 6c5.7 0 9 6 9 6a15.6 15.6 0 0 1-2.2 3M6.2 7.8C4.2 9.4 3 12 3 12s3.3 6 9 6a9 9 0 0 0 4.3-1.1" /><path d="M4 4l16 16" /></>, size);
 export const Mute = ({size = 16}: P) => base(<><path d="M5 10v4h3l4 3.5v-11L8 10z" /><path d="M16 10l4 4M20 10l-4 4" /></>, size);
+export const TextT = ({size = 16}: P) => base(<><path d="M5 6.5V5h14v1.5" /><path d="M12 5v14" /><path d="M9.5 19h5" /></>, size);
+export const Flag = ({size = 16}: P) => base(<><path d="M6 20V4.5" /><path d="M6 5h11l-2.5 4L17 13H6" /></>, size);
 export const Minus = ({size = 16}: P) => base(<path d="M5 12h14" />, size);
 export const FitWidth = ({size = 16}: P) => base(<><path d="M4 6v12M20 6v12" /><path d="M8 12h8" /><path d="M10.5 9.5L8 12l2.5 2.5M13.5 9.5L16 12l-2.5 2.5" /></>, size);

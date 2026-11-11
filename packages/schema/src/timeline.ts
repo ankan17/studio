@@ -75,3 +75,22 @@ export function timecode(frame: number, fps: number): string {
   const h = Math.floor(total / 3600);
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}:${ff}` : `${String(m).padStart(2, "0")}:${s}:${ff}`;
 }
+
+/**
+ * Where a clip's picture goes in the frame, before its transform: a box (centred in the W x H frame) that shows the kept
+ * part of the source, and the whole media element placed inside that box so the crop lines up with its edges.
+ * `crop` is in fractions of the displayed source (after rotation), so the proxy and the original crop alike.
+ * Contain fits the kept part inside the frame; cover fills the frame with it. Without the source size the media simply
+ * fills the frame. Shared by the composition (preview and export) and the canvas selection box.
+ */
+export function pictureLayout(clip: Pick<Clip, "fit" | "crop">, source: {width?: number; height?: number}, W: number, H: number) {
+  const {width: sw, height: sh} = source;
+  if (!sw || !sh) return {boxW: W, boxH: H, mediaW: W, mediaH: H, mediaX: 0, mediaY: 0};
+  const c = clip.crop ?? {x: 0, y: 0, width: 1, height: 1};
+  const keptW = c.width * sw;
+  const keptH = c.height * sh;
+  const s = clip.fit === "cover" ? Math.max(W / keptW, H / keptH) : Math.min(W / keptW, H / keptH);
+  const boxW = clip.fit === "cover" ? W : keptW * s;
+  const boxH = clip.fit === "cover" ? H : keptH * s;
+  return {boxW, boxH, mediaW: sw * s, mediaH: sh * s, mediaX: (boxW - keptW * s) / 2 - c.x * sw * s, mediaY: (boxH - keptH * s) / 2 - c.y * sh * s};
+}

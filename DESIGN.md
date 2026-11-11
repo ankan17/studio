@@ -196,7 +196,7 @@ A dark, hue-tinted graphite field with three media-line colours and one gold for
 ### Secondary
 - **Video Line Blue** (video): the video roundel "V", video rails, the 3px bar under video clip blocks.
 - **Audio Line Purple** (audio): the audio roundel "A", audio rails, clip bars and waveform strokes.
-- **Stills Line Cyan** (still): the image roundel "I" and image clip bars; reserved for titles when they arrive.
+- **Stills Line Cyan** (still): the image roundel "I" and image clip bars, and titles: the "T" roundel, text tracks and title clips.
 
 ### Tertiary
 - **Orange Caution** (warn): unsaved and saving dots (saved is an ink-3 check, never a colour, so it cannot be mistaken for them), the memory readout near its budget, missing-file tiles, the recovery notice (10% fill, 30% border).

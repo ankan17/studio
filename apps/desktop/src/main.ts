@@ -12,6 +12,9 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 registerMediaScheme();
+// Development only: Vite serves the workspace packages' source as `immutable` under a hash that changes only with
+// dependencies, so Chromium's on-disk cache would keep running an old editor-core or schema after an edit.
+if (!app.isPackaged) app.commandLine.appendSwitch("disable-http-cache");
 
 const E2E_ARGS = process.env.STUDIO_E2E === "1" && !app.isPackaged ? ["--studio-e2e"] : [];
 let mainWindow: BrowserWindow | null = null;

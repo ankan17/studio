@@ -56,7 +56,8 @@ export function Editor() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // In the project name field, Cmd+Z undoes the rename through the history (the field's own undo fights React).
-      const nameField = e.target instanceof HTMLInputElement && e.target.getAttribute("aria-label") === "Project name";
+      // The same for a title's text (any field marked data-history-undo).
+      const nameField = e.target instanceof HTMLElement && e.target.matches('input[aria-label="Project name"], [data-history-undo]');
       if (nameField && (e.metaKey || e.ctrlKey) && e.code === "KeyZ") {
         e.preventDefault();
         return void (e.shiftKey ? useEditor.getState().redo() : useEditor.getState().undo());
@@ -86,6 +87,8 @@ export function Editor() {
       else if (e.code === "KeyS") hit(edits.split);
       else if (e.code === "Delete" || e.code === "Backspace") hit(edits.delete);
       else if (e.code === "KeyN") hit(view.toggleSnapping);
+      else if (e.code === "KeyM") hit(edits.addMarker);
+      else if (e.code === "KeyT") hit(edits.addText);
       else if (e.code === "KeyZ" && e.shiftKey) hit(view.fit);
       else if (e.code === "Equal") hit(() => view.zoomBy(1.5));
       else if (e.code === "Minus") hit(() => view.zoomBy(1 / 1.5));

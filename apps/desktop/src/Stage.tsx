@@ -1,7 +1,7 @@
 import {Player, type PlayerRef} from "@remotion/player";
 import {projectDurationFrames} from "@studio/schema";
 import {useEffect, useMemo, useRef} from "react";
-import {CanvasSelect} from "./CanvasSelect";
+import {CanvasSelect, cropView, useCrop} from "./CanvasSelect";
 import {ProjectComposition, type EngineProps} from "./engine/ProjectComposition";
 import {useEditor} from "./editorStore";
 import {attachPlayer, setDuration, usePlayback} from "./playback";
@@ -14,7 +14,9 @@ export function Stage() {
   const ref = useRef<PlayerRef>(null);
   const total = projectDurationFrames(project);
   const ratio = project.width / project.height;
-  const inputProps = useMemo<EngineProps>(() => ({project, baseUrl, mode: "preview"}), [project, baseUrl]);
+  const cropping = useCrop((s) => s.clipId);
+  // in crop mode the clip being cropped is drawn whole, so its handles can reach every edge of the source
+  const inputProps = useMemo<EngineProps>(() => ({project: cropping ? cropView(project, cropping) : project, baseUrl, mode: "preview"}), [project, baseUrl, cropping]);
 
   useEffect(() => setDuration(total), [total]);
   useEffect(() => {
@@ -38,6 +40,7 @@ export function Stage() {
           compositionWidth={project.width}
           compositionHeight={project.height}
           loop={loop}
+          moveToBeginningWhenEnded={false} // rest on the last frame when playback reaches the end
           controls={false}
           clickToPlay={false}
           style={{width: "100%", height: "100%"}}

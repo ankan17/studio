@@ -17,22 +17,13 @@ export function attachPlayer(p: PlayerRef | null): void {
   const onFrame = (e: {detail: {frame: number}}) => usePlayback.setState({frame: e.detail.frame});
   const onPlay = () => usePlayback.setState({playing: true});
   const onPause = () => usePlayback.setState({playing: false});
-  // Rest on the last frame when playback reaches the end (the Player would otherwise show frame 0).
-  // Only when playback was running: seeking onto the last frame also fires "ended", and must not seek again.
-  const onEnded = () => {
-    const wasPlaying = usePlayback.getState().playing;
-    usePlayback.setState({playing: false});
-    if (wasPlaying && !usePlayback.getState().loop) playback.toEnd();
-  };
   p.addEventListener("frameupdate", onFrame);
   p.addEventListener("play", onPlay);
   p.addEventListener("pause", onPause);
-  p.addEventListener("ended", onEnded);
   detach = () => {
     p.removeEventListener("frameupdate", onFrame);
     p.removeEventListener("play", onPlay);
     p.removeEventListener("pause", onPause);
-    p.removeEventListener("ended", onEnded);
   };
   usePlayback.setState({frame: p.getCurrentFrame(), playing: p.isPlaying()});
 }

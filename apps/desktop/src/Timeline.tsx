@@ -2,18 +2,19 @@
 // cut that lines up across tracks is an interchange ring.
 //
 // Editing: drag a clip to move it (across tracks of the same kind too), drag its edges to trim, with snapping to clip
-// edges, the playhead and markers. Shift or Cmd click adds to the selection. Right-click opens a menu. Every edit is
+// edges, the playhead and markers. Shift or Cmd click adds to the selection. Right-click opens a menu. Markers on the
+// ruler: click to jump, drag to move, double-click to name, right-click to rename or delete. Every edit is
 // one command through the editor store, so it can be undone.
 //
 // Performance: only rows and clips inside the viewport are rendered (React never sees the rest), clip bodies with their
 // filmstrips and waveforms are painted onto one canvas per visible row, and scrolling and zoom are this component's own
 // state, so the canvas and the DOM move in the same frame.
-import {applyCommand, clampTrim, fits, assetKind, locate, resolveMove, snap, snapPoints, type Command} from "@studio/editor-core";
+import {applyCommand, clampTrim, clipKind, fits, locate, transitionRoom, resolveMove, snap, snapPoints, type Command} from "@studio/editor-core";
 import {projectDurationFrames, timecode, type Asset, type Clip, type Project, type Track} from "@studio/schema";
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 import {edits, MAX_PPF, useView, view} from "./edits";
 import {history, useEditor} from "./editorStore";
-import {Eye, EyeOff, FitWidth, Lock, Magnet, Minus, Mute, Plus, Redo, Scissors, Trash, Undo, Unlock, Volume} from "./icons";
+import {Eye, EyeOff, FitWidth, Flag, TextT, Lock, Magnet, Minus, Mute, Plus, Redo, Scissors, Trash, Undo, Unlock, Volume} from "./icons";
 import {ContextMenu, type MenuState} from "./Menu";
 import {useMedia} from "./mediaStore";
 import {playback, usePlayback} from "./playback";
@@ -39,8 +40,8 @@ const isMac = navigator.platform.startsWith("Mac");
 const MOD = isMac ? "⌘" : "Ctrl+";
 
 /** A track's line: the type of its first clip's asset, or its own type when empty. */
-function trackKind(t: Track, kindOf: (c: Clip) => LineKind): LineKind {
-  return t.clips[0] ? kindOf(t.clips[0]) : t.type === "audio" ? "audio" : t.type === "image" ? "image" : "video";
+function trackKind(t: Track, kindOf: (c: Clip, t: Track) => LineKind): LineKind {
+  return t.clips[0] ? kindOf(t.clips[0], t) : t.type === "audio" ? "audio" : t.type === "text" ? "text" : t.type === "image" ? "image" : "video";
 }
 
 /** Clips of a track overlapping frames [from, to); clips are sorted by start and never overlap, so a binary search finds the first. */
@@ -68,7 +69,7 @@ type Colors = Record<LineKind | "surface" | "ink", string>;
 function readColors(): Colors {
   const css = getComputedStyle(document.documentElement);
   const v = (n: string) => css.getPropertyValue(`--color-${n}`).trim();
-  return {video: v("video"), audio: v("audio"), image: v("still"), surface: v("surface"), ink: v("ink")};
+  return {video: v("video"), audio: v("audio"), image: v("still"), text: v("still"), surface: v("surface"), ink: v("ink")};
 }
 /** `a` mixed into `b` by `t` (hex colours), like color-mix(in srgb, a t, b). */
 function mix(a: string, b: string, t: number): string {
@@ -81,6 +82,7 @@ type Gesture =
   | {kind: "scrub"; resume: boolean}
   | {kind: "move"; id: string; ids: string[]; x0: number; y0: number; started: boolean; collapseTo: string | null}
   | {kind: "trim"; id: string; edge: "start" | "end"; x0: number; started: boolean}
+  | {kind: "marker"; id: string; x0: number; started: boolean}
   | {kind: "scrollbar"; x0: number; scroll0: number};
 
 export function Timeline() {
@@ -102,6 +104,8 @@ export function Timeline() {
   const [width, setWidth] = useState(1200);
   const [preview, setPreview] = useState<{cmd: Command; snapAt: number | null} | null>(null);
   const [menu, setMenu] = useState<MenuState>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const lastMarkerClick = useRef<{id: string; at: number} | null>(null); // pointer capture retargets dblclick, so count clicks here
   const [drawTick, setDrawTick] = useState(0);
   const redraw = useCallback(() => setDrawTick((n) => n + 1), []);
   const colors = useMemo(readColors, []);
@@ -143,7 +147,8 @@ export function Timeline() {
   });
 
   const assets = useMemo(() => new Map(project.assets.map((a) => [a.id, a])), [project.assets]);
-  const kindOf = useCallback((c: Clip): LineKind => (c.assetId && assets.get(c.assetId)?.type) || "video", [assets]);
+  // a clip on an audio track is sound, even when it comes from a video (detached audio)
+  const kindOf = useCallback((c: Clip, t: Track): LineKind => (t.type === "audio" ? "audio" : t.type === "text" ? "text" : (c.assetId && assets.get(c.assetId)?.type) || "video"), [assets]);
   const firstRow = Math.floor(sy / ROW_H);
   const lastRow = Math.min(project.tracks.length - 1, Math.floor((sy + bodyH - 1) / ROW_H));
   const rowTracks = useMemo(() => shown.tracks.map((t, i) => ({t, i})).filter(({i}) => i >= firstRow && i <= lastRow), [shown.tracks, firstRow, lastRow]);
@@ -164,7 +169,7 @@ export function Timeline() {
       ctx.clearRect(0, 0, laneW, ROW_H);
       for (const clip of visibleClips(t, fromF, toF)) {
         const asset = clip.assetId ? assets.get(clip.assetId) : undefined;
-        drawClip(ctx, {clip, asset, x0: PAD + clip.startFrame * ppf - sx, w: clip.durationInFrames * ppf, laneW, fps, ppf, colors, kind: kindOf(clip), baseUrl, projectId: project.id, rev: asset ? (rev[asset.sha256] ?? 0) : 0, used, redraw});
+        drawClip(ctx, {clip, asset, x0: PAD + clip.startFrame * ppf - sx, w: clip.durationInFrames * ppf, laneW, fps, ppf, colors, kind: kindOf(clip, t), baseUrl, projectId: project.id, rev: asset ? (rev[asset.sha256] ?? 0) : 0, used, redraw});
       }
     }
     evictImages(used);
@@ -211,7 +216,7 @@ export function Timeline() {
     let toTrackId: string | undefined;
     const sameTrack = new Set(located.map((m) => m.track.id)).size === 1;
     const target = project.tracks[rowAt(e.clientY)];
-    if (sameTrack && target && target.id !== located[0]!.track.id && !target.locked && located.every((m) => fits(assetKind(project, m.clip), target))) toTrackId = target.id;
+    if (sameTrack && target && target.id !== located[0]!.track.id && !target.locked && located.every((m) => fits(clipKind(project, m.clip, m.track), target))) toTrackId = target.id;
     let snapAt: number | null = null;
     if (snapping) {
       const edges = located.flatMap((m) => [m.clip.startFrame + delta, m.clip.startFrame + m.clip.durationInFrames + delta]);
@@ -241,6 +246,19 @@ export function Timeline() {
     return {cmd: {type: "trimClip", clipId: g.id, edge: g.edge, deltaFrames: d}, snapAt: d === delta ? snapAt : null};
   };
 
+  const markerCmd = (g: Extract<Gesture, {kind: "marker"}>, e: React.PointerEvent): {cmd: Command; snapAt: number | null} | null => {
+    const m = project.markers.find((x) => x.id === g.id);
+    if (!m) return null;
+    let f = Math.max(0, m.frame + Math.round((e.clientX - g.x0) / ppf));
+    let snapAt: number | null = null;
+    if (snapping) {
+      const s = snap([f], snapPoints({tracks: project.tracks, markers: project.markers.filter((x) => x.id !== g.id)}, {playhead: frame}), SNAP_PX / ppf);
+      f = Math.max(0, f + s.adjust);
+      snapAt = s.at;
+    }
+    return {cmd: {type: "updateMarker", markerId: g.id, patch: {frame: f}}, snapAt};
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
@@ -250,6 +268,18 @@ export function Timeline() {
     const bar = target.closest<HTMLElement>("[data-scrollbar]");
     if (bar) {
       gesture.current = {kind: "scrollbar", x0: e.clientX, scroll0: sx};
+      el.setPointerCapture(e.pointerId);
+      return;
+    }
+    const tr = target.closest<HTMLElement>("[data-transition]");
+    if (tr) {
+      select([tr.dataset.transition!]); // the transition belongs to the clip before the cut
+      return;
+    }
+    const marker = target.closest<HTMLElement>("[data-marker]");
+    if (marker) {
+      gesture.current = {kind: "marker", id: marker.dataset.marker!, x0: e.clientX, started: false};
+      document.body.dataset.dragging = "true";
       el.setPointerCapture(e.pointerId);
       return;
     }
@@ -290,9 +320,9 @@ export function Timeline() {
     if (g.kind === "scrub") playback.seek(toFrame(e.clientX));
     else if (g.kind === "scrollbar") useView.setState({scrollX: Math.max(0, g.scroll0 + ((e.clientX - g.x0) * contentW) / laneW)});
     else {
-      if (!g.started && Math.abs(e.clientX - g.x0) < DRAG_PX && (g.kind === "trim" || Math.abs(e.clientY - g.y0) < DRAG_PX)) return;
+      if (!g.started && Math.abs(e.clientX - g.x0) < DRAG_PX && (g.kind !== "move" || Math.abs(e.clientY - g.y0) < DRAG_PX)) return;
       g.started = true;
-      setPreview(g.kind === "move" ? moveCmd(g, e) : trimCmd(g, e));
+      setPreview(g.kind === "move" ? moveCmd(g, e) : g.kind === "trim" ? trimCmd(g, e) : markerCmd(g, e));
     }
   };
 
@@ -303,6 +333,20 @@ export function Timeline() {
     if (!g || !e.currentTarget.hasPointerCapture(e.pointerId)) return;
     e.currentTarget.releasePointerCapture(e.pointerId);
     if (g.kind === "scrub" && g.resume) playback.play();
+    if (g.kind === "marker") {
+      const final = g.started ? markerCmd(g, e) : null;
+      if (final) dispatch(final.cmd, {label: "Move marker"});
+      else {
+        const m = project.markers.find((x) => x.id === g.id);
+        if (m) playback.seek(m.frame); // a click jumps to the marker, a second click names it
+        const last = lastMarkerClick.current;
+        if (last?.id === g.id && e.timeStamp - last.at < 400) {
+          setRenaming(g.id);
+          lastMarkerClick.current = null;
+        } else lastMarkerClick.current = {id: g.id, at: e.timeStamp};
+      }
+      setPreview(null);
+    }
     if (g.kind === "move" || g.kind === "trim") {
       // commit from the final pointer position, not the last rendered preview (which can be a move behind)
       const final = g.started ? (g.kind === "move" ? moveCmd(g, e) : trimCmd(g, e)) : null;
@@ -319,7 +363,14 @@ export function Timeline() {
     const at = {x: e.clientX, y: e.clientY};
     const hit = target.closest<HTMLElement>("[data-clip]");
     const head = target.closest<HTMLElement>("[data-track-head]");
-    if (hit) {
+    const marker = target.closest<HTMLElement>("[data-marker]");
+    if (marker) {
+      const id = marker.dataset.marker!;
+      setMenu({...at, label: "Marker", items: [
+        {label: "Rename", onSelect: () => setRenaming(id)},
+        {label: "Delete marker", onSelect: () => dispatch({type: "deleteMarker", markerId: id}), danger: true},
+      ]});
+    } else if (hit) {
       const id = hit.dataset.clip!;
       if (!selected.has(id)) select([id]);
       const ids = selected.has(id) ? selection : [id];
@@ -331,6 +382,12 @@ export function Timeline() {
       setMenu({...at, label: "Clip", items: [
         {label: "Split at playhead", shortcut: "S", onSelect: edits.split, disabled: !inside || !editable},
         {label: "Duplicate", shortcut: `${MOD}D`, onSelect: edits.duplicate, disabled: !editable},
+        ...(ids.length === 1 && canDetach(project, ids[0]!) ? [{label: "Detach audio", onSelect: edits.detachAudio, disabled: !editable}] : []),
+        ...(ids.length === 1 && locate(project, ids[0]!)?.clip.transitionOut
+          ? [{label: "Remove transition", onSelect: () => edits.setTransition(null, ids[0]), disabled: !editable}]
+          : ids.length === 1 && !transitionRoom(project, ids[0]!).reason
+            ? [{label: "Add dissolve to next", onSelect: () => edits.setTransition("fade", ids[0]), disabled: !editable}]
+            : []),
         {label: ids.length > 1 ? `Delete ${ids.length} clips` : "Delete", shortcut: "⌫", onSelect: edits.delete, disabled: !editable, danger: true},
         "separator",
         {label: "Select all", shortcut: `${MOD}A`, onSelect: edits.selectAll},
@@ -341,7 +398,7 @@ export function Timeline() {
       const set = (patch: {locked?: boolean; visible?: boolean; muted?: boolean}) => dispatch({type: "setTrack", trackId: t.id, patch});
       setMenu({...at, label: "Track", items: [
         {label: t.visible ? "Hide track" : "Show track", onSelect: () => set({visible: !t.visible})},
-        {label: t.muted ? "Unmute track" : "Mute track", onSelect: () => set({muted: !t.muted})},
+        ...(t.type === "text" ? [] : [{label: t.muted ? "Unmute track" : "Mute track", onSelect: () => set({muted: !t.muted})}]),
         {label: t.locked ? "Unlock track" : "Lock track", onSelect: () => set({locked: !t.locked})},
         "separator",
         {label: "Move up", onSelect: () => dispatch({type: "moveTrack", trackId: t.id, toIndex: i - 1}), disabled: i === 0},
@@ -394,7 +451,9 @@ export function Timeline() {
   const visibleCount = rowTracks.reduce((n, {t}) => n + visibleClips(t, fromF, toF).length, 0);
 
   const zoomV = Math.log(ppf / fitPpf) / Math.log(MAX_PPF / fitPpf || 2);
-  const trackCount = (type: "audio" | "video", i: number) => project.tracks.filter((x, j) => j <= i && (x.type === "audio") === (type === "audio")).length;
+  // track tags: A for audio, T for titles, V for pictures, numbered within each
+  const letter = (t: Track) => (t.type === "audio" ? "A" : t.type === "text" ? "T" : "V");
+  const trackTag = (t: Track, i: number) => `${letter(t)}${project.tracks.filter((x, j) => j <= i && letter(x) === letter(t)).length}`;
 
   return (
     <div
@@ -425,6 +484,8 @@ export function Timeline() {
         <button className="icon-btn" title="Split at the playhead (S)" aria-label="Split" disabled={clipCount === 0} onClick={edits.split}><Scissors /></button>
         <button className="icon-btn" title="Delete selected clips (⌫)" aria-label="Delete clips" disabled={!edits.selectionEditable()} onClick={edits.delete}><Trash /></button>
         <button className="icon-btn" title="Snapping (N)" aria-label="Snapping" aria-pressed={snapping} onClick={view.toggleSnapping}><Magnet /></button>
+        <button className="icon-btn" title="Add a marker at the playhead (M)" aria-label="Add marker" onClick={edits.addMarker}><Flag /></button>
+        <button className="icon-btn" title="Add a title at the playhead (T)" aria-label="Add title" onClick={edits.addText}><TextT /></button>
         <span className="mx-1.5 h-4 w-px bg-line" />
         <button
           className="btn btn-ghost !h-[30px] !px-2"
@@ -466,9 +527,23 @@ export function Timeline() {
             {label(f)}
           </span>
         ))}
-        {project.markers.map((m) => (
-          <span key={m.id} className="pointer-events-none absolute bottom-0 h-[8px] w-[8px] -translate-x-1/2 rotate-45 bg-ink-2" style={{left: x(m.frame), bottom: -4}} title={m.label} />
+        {shown.markers.map((m) => (
+          <div key={m.id} className="group absolute inset-y-0 z-[2] flex cursor-pointer items-end" style={{left: x(m.frame) - 7}} data-marker={m.id} data-testid="marker" title={m.label || "Marker: double-click to name"}>
+            <span className="mb-[-4px] h-[8px] w-[8px] translate-x-[3px] rotate-45 bg-ink-2 group-hover:bg-ink" />
+            {m.label && renaming !== m.id && <span className="mb-[3px] ml-[5px] max-w-[140px] truncate rounded-[3px] bg-raised px-1 text-[10.5px] leading-[14px] text-ink-2">{m.label}</span>}
+          </div>
         ))}
+        {renaming && shown.markers.some((m) => m.id === renaming) && (
+          <MarkerName
+            key={renaming}
+            left={x(shown.markers.find((m) => m.id === renaming)!.frame) + 8}
+            value={shown.markers.find((m) => m.id === renaming)!.label}
+            onDone={(label) => {
+              if (label !== null) dispatch({type: "updateMarker", markerId: renaming, patch: {label}}, {label: "Rename marker"});
+              setRenaming(null);
+            }}
+          />
+        )}
       </div>
 
       {/* rows */}
@@ -478,8 +553,7 @@ export function Timeline() {
         )}
         {rowTracks.map(({t, i}) => {
           const kind = trackKind(t, kindOf);
-          const n = trackCount(t.type === "audio" ? "audio" : "video", i);
-          const tag = `${t.type === "audio" ? "A" : "V"}${n}`;
+          const tag = trackTag(t, i);
           const set = (patch: {locked?: boolean; visible?: boolean; muted?: boolean}) => dispatch({type: "setTrack", trackId: t.id, patch});
           const dim = !t.visible || (t.type === "audio" && t.muted);
           return (
@@ -493,9 +567,9 @@ export function Timeline() {
                     {t.visible ? <Eye size={14} /> : <EyeOff size={14} />}
                   </button>
                 )}
-                <button className="icon-btn !h-6 !w-6" aria-pressed={t.muted} title={t.muted ? `Unmute ${tag}` : `Mute ${tag}`} aria-label={t.muted ? `Unmute track ${tag}` : `Mute track ${tag}`} onClick={() => set({muted: !t.muted})}>
+                {t.type !== "text" && <button className="icon-btn !h-6 !w-6" aria-pressed={t.muted} title={t.muted ? `Unmute ${tag}` : `Mute ${tag}`} aria-label={t.muted ? `Unmute track ${tag}` : `Mute track ${tag}`} onClick={() => set({muted: !t.muted})}>
                   {t.muted ? <Mute size={14} /> : <Volume size={14} />}
-                </button>
+                </button>}
                 <button className="icon-btn !h-6 !w-6" aria-pressed={t.locked} title={t.locked ? `Unlock ${tag}` : `Lock ${tag}`} aria-label={t.locked ? `Unlock track ${tag}` : `Lock track ${tag}`} onClick={() => set({locked: !t.locked})}>
                   {t.locked ? <Lock size={14} /> : <Unlock size={14} />}
                 </button>
@@ -519,7 +593,10 @@ export function Timeline() {
                       data-selected={sel || undefined}
                       title={asset?.name}
                     >
-                      <div className="pointer-events-none truncate px-2 pt-1 text-[11px] font-medium leading-[14px] text-ink [text-shadow:0_1px_2px_var(--color-ground)]">{asset?.name ?? "Missing file"}</div>
+                      <div className="pointer-events-none truncate px-2 pt-1 text-[11px] font-medium leading-[14px] text-ink [text-shadow:0_1px_2px_var(--color-ground)]">
+                        {c.text ? c.text.content || "Empty title" : (asset?.name ?? "Missing file")}
+                        {c.speed !== 1 && <span className="num text-ink-2"> · {Number(c.speed.toFixed(2))}×</span>}
+                      </div>
                       {!t.locked && w > 12 && (
                         <>
                           <div data-trim="start" className="absolute inset-y-0 left-0 cursor-ew-resize" style={{width: handle}}>
@@ -531,6 +608,23 @@ export function Timeline() {
                         </>
                       )}
                     </div>
+                  );
+                })}
+                {visibleClips(t, fromF, toF).map((c, i, vis) => {
+                  const tr = c.transitionOut;
+                  const next = vis[i + 1] ?? t.clips[t.clips.indexOf(c) + 1];
+                  if (!tr || !next || next.startFrame !== c.startFrame + c.durationInFrames) return null;
+                  const cut = next.startFrame;
+                  const left = x(cut - Math.floor(tr.durationInFrames / 2));
+                  return (
+                    <span
+                      key={`tr-${c.id}`}
+                      className="absolute top-1/2 z-[4] h-[16px] -translate-y-1/2 cursor-pointer rounded-full border-2 border-ink bg-surface/80 [background-image:linear-gradient(115deg,transparent_45%,var(--color-ink)_45%,var(--color-ink)_55%,transparent_55%)]"
+                      style={{left, width: Math.max(12, tr.durationInFrames * ppf)}}
+                      data-transition={c.id}
+                      data-testid="transition"
+                      title={`${tr.kind === "fade" ? "Dissolve" : tr.kind === "slide" ? "Slide" : "Wipe"}, ${(tr.durationInFrames / fps).toFixed(2)} s`}
+                    />
                   );
                 })}
                 {[...(cuts.get(t.id) ?? [])].filter((f) => !interchanges.includes(f)).map((f) => (
@@ -570,6 +664,41 @@ export function Timeline() {
   );
 }
 
+/** The inline name field for a marker: Enter or leaving the field saves, Escape cancels. */
+function MarkerName({left, value, onDone}: {left: number; value: string; onDone: (label: string | null) => void}) {
+  const done = useRef(false);
+  const finish = (label: string | null) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(label);
+  };
+  return (
+    <input
+      autoFocus
+      data-no-gesture
+      aria-label="Marker name"
+      className="field absolute top-[3px] z-[5] !h-5 w-[160px] !px-1.5 !text-[11px]"
+      style={{left}}
+      defaultValue={value}
+      maxLength={80}
+      onFocus={(e) => e.currentTarget.select()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") finish(e.currentTarget.value);
+        else if (e.key === "Escape") finish(null);
+      }}
+      onBlur={(e) => finish(e.currentTarget.value)}
+    />
+  );
+}
+
+/** A video clip on a picture track whose media has sound. */
+function canDetach(p: Project, clipId: string): boolean {
+  const m = locate(p, clipId);
+  const asset = m && p.assets.find((a) => a.id === m.clip.assetId);
+  return !!m && !!asset && m.track.type !== "audio" && asset.type === "video" && asset.audioChannels !== 0;
+}
+
 type DrawArgs = {
   clip: Clip; asset: Asset | undefined; x0: number; w: number; laneW: number; fps: number; ppf: number; colors: Colors; kind: LineKind;
   baseUrl: string; projectId: string; rev: number; used: Set<string>; redraw: () => void;
@@ -592,7 +721,7 @@ function drawClip(ctx: CanvasRenderingContext2D, a: DrawArgs): void {
   ctx.fillRect(from, top, to - from, h);
   const speed = clip.speed;
   const srcAt = (px: number) => clip.sourceStartUs / 1e6 + (px / ppf / fps) * speed; // seconds into the source at clip x
-  if (asset && asset.type === "video" && asset.durationUs) {
+  if (asset && kind === "video" && asset.durationUs) {
     const url = `${a.baseUrl}/cache/${asset.sha256}.filmstrip.jpg?v=${a.rev}`;
     a.used.add(url);
     const img = image(url, a.redraw);
@@ -606,7 +735,7 @@ function drawClip(ctx: CanvasRenderingContext2D, a: DrawArgs): void {
       }
       ctx.globalAlpha = 1;
     }
-  } else if (asset && asset.type === "image") {
+  } else if (asset && kind === "image") {
     const url = `${a.baseUrl}/cache/${asset.sha256}.thumb.jpg?v=${a.rev}`;
     a.used.add(url);
     const img = image(url, a.redraw);
@@ -616,7 +745,7 @@ function drawClip(ctx: CanvasRenderingContext2D, a: DrawArgs): void {
       for (let i = Math.max(0, Math.floor((from - x0) / slotW)); x0 + i * slotW < to; i++) ctx.drawImage(img, x0 + i * slotW, top, slotW, h);
       ctx.globalAlpha = 1;
     }
-  } else if (asset && asset.type === "audio") {
+  } else if (asset && kind === "audio") {
     const peaks = peaksFor(a.projectId, `${asset.sha256}:${a.rev}`, asset.sha256, a.redraw);
     if (peaks) {
       const waveTop = top + 17;

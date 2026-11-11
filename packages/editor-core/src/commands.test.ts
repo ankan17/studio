@@ -1,6 +1,6 @@
 import {createProject, type Asset, type Clip, type Project} from "@studio/schema";
 import {describe, expect, it} from "vitest";
-import {applyCommand, clampTrim, History, locate, resolveMove, snap, snapPoints, type Command} from "./index";
+import {applyCommand, clampTrim, clipKind, dragCrop, History, maxTransition, locate, resolveMove, snap, snapPoints, type Command} from "./index";
 
 const FPS = 30;
 const asset = (id: string, over: Partial<Asset> = {}): Asset => ({id, relativePath: `assets/${id}.mp4`, type: "video", sha256: id.padEnd(64, "0"), rotation: 0, durationUs: 10_000_000, ...over});
@@ -341,12 +341,15 @@ describe("review fixes", () => {
           {type: "splitClips", frame: Math.round(rand() * 300), clipIds: clips, newIds: Object.fromEntries(clips.map((x) => [x, `n${id++}`]))},
           {type: "duplicateClips", clipIds: clips.filter(() => rand() < 0.3), newIds: Object.fromEntries(clips.map((x) => [x, `d${id++}`]))},
           {type: "deleteClips", clipIds: [c]},
+          {type: "setSpeed", clipId: c, speed: pick([0.5, 0.75, 1.25, 2])},
+          {type: "setTransition", clipId: c, transition: {kind: pick(["fade", "slide", "wipe"] as const), durationInFrames: Math.round(rand() * 40)}},
         ]);
         const r = applyCommand(p, cmd);
         if (!r.ok) continue;
         h.record({label: cmd.type, patches: r.patches, inverse: r.inverse, at: step});
         p = r.project;
         for (const t of p.tracks) t.clips.forEach((x, i) => i && expect(x.startFrame).toBeGreaterThanOrEqual(t.clips[i - 1]!.startFrame + t.clips[i - 1]!.durationInFrames));
+        for (const t of p.tracks) for (const x of t.clips) if (x.transitionOut) expect(x.transitionOut.durationInFrames).toBeLessThanOrEqual(maxTransition(p, x.id));
       }
       const end = p;
       while (h.canUndo) p = h.undo(p)!;
@@ -354,5 +357,257 @@ describe("review fixes", () => {
       while (h.canRedo) p = h.redo(p)!;
       expect(JSON.stringify(p)).toBe(JSON.stringify(end));
     }
+  });
+});
+
+describe("markers", () => {
+  const markers = (p: Project) => p.markers.map((m) => [m.id, m.frame, m.label]);
+  it("adds markers kept in frame order, with a trimmed label", () => {
+    let p = ok(fixture(), {type: "addMarker", markerId: "m2", frame: 90, label: "  Intro end "});
+    p = ok(p, {type: "addMarker", markerId: "m1", frame: 30, label: ""});
+    expect(markers(p)).toEqual([["m1", 30, ""], ["m2", 90, "Intro end"]]);
+  });
+  it("refuses a negative or fractional frame and a repeated id", () => {
+    const p = ok(fixture(), {type: "addMarker", markerId: "m1", frame: 30, label: ""});
+    expect(err(p, {type: "addMarker", markerId: "m2", frame: -1, label: ""})).toBeTruthy();
+    expect(err(p, {type: "addMarker", markerId: "m2", frame: 1.5, label: ""})).toBeTruthy();
+    expect(err(p, {type: "addMarker", markerId: "m1", frame: 40, label: ""})).toBeTruthy();
+  });
+  it("renames, moves (re-sorting) and deletes, and all of it undoes", () => {
+    const h = new History();
+    const p0 = ok(ok(fixture(), {type: "addMarker", markerId: "a", frame: 10, label: "A"}), {type: "addMarker", markerId: "b", frame: 20, label: "B"});
+    let p = p0;
+    for (const cmd of [
+      {type: "updateMarker", markerId: "a", patch: {label: "Hook", frame: 50}},
+      {type: "deleteMarker", markerId: "b"},
+    ] satisfies Command[]) {
+      const r = applyCommand(p, cmd);
+      if (!r.ok) throw new Error(r.error);
+      h.record({label: cmd.type, patches: r.patches, inverse: r.inverse, at: 0});
+      p = r.project;
+      if (cmd.type === "updateMarker") expect(markers(p)).toEqual([["b", 20, "B"], ["a", 50, "Hook"]]);
+    }
+    expect(markers(p)).toEqual([["a", 50, "Hook"]]);
+    while (h.canUndo) p = h.undo(p)!;
+    expect(JSON.stringify(p)).toBe(JSON.stringify(p0));
+    expect(err(p, {type: "updateMarker", markerId: "zz", patch: {label: "x"}})).toBeTruthy();
+    expect(err(p, {type: "updateMarker", markerId: "a", patch: {frame: -3}})).toBeTruthy();
+  });
+});
+
+describe("picture", () => {
+  it("sets, validates and clears a crop as fractions of the source", () => {
+    const p0 = fixture();
+    const p = ok(p0, {type: "updateClip", clipId: "a", patch: {crop: {x: 0.1, y: 0, width: 0.8, height: 1}}});
+    expect(clipOf(p, "a").crop).toEqual({x: 0.1, y: 0, width: 0.8, height: 1});
+    expect(err(p0, {type: "updateClip", clipId: "a", patch: {crop: {x: 0.5, y: 0, width: 0.6, height: 1}}})).toBeTruthy(); // past the right edge
+    expect(err(p0, {type: "updateClip", clipId: "a", patch: {crop: {x: -0.1, y: 0, width: 0.5, height: 1}}})).toBeTruthy();
+    expect(err(p0, {type: "updateClip", clipId: "a", patch: {crop: {x: 0, y: 0, width: 0.01, height: 1}}})).toBeTruthy(); // too small to see
+    const cleared = ok(p, {type: "updateClip", clipId: "a", patch: {crop: null}});
+    expect("crop" in clipOf(cleared, "a")).toBe(false);
+  });
+  it("a crop of the whole picture is stored as no crop", () => {
+    const p = ok(fixture(), {type: "updateClip", clipId: "a", patch: {crop: {x: 0, y: 0, width: 1, height: 1}}});
+    expect("crop" in clipOf(p, "a")).toBe(false);
+  });
+  it("sets rotation and flip, and refuses a rotation that is not a number", () => {
+    const p = ok(fixture(), {type: "updateClip", clipId: "a", patch: {transform: {rotation: -90, flipH: true}}});
+    expect(clipOf(p, "a").transform).toMatchObject({rotation: -90, flipH: true});
+    expect(err(p, {type: "updateClip", clipId: "a", patch: {transform: {rotation: Number.NaN}}})).toBeTruthy();
+  });
+});
+
+describe("dragCrop", () => {
+  const full = {x: 0, y: 0, width: 1, height: 1};
+  it("drags one edge, a corner, and stops at the picture and at the smallest crop", () => {
+    expect(dragCrop(full, "w", 0.2, 0.5)).toEqual({x: 0.2, y: 0, width: 0.8, height: 1});
+    expect(dragCrop(full, "se", -0.25, -0.5)).toEqual({x: 0, y: 0, width: 0.75, height: 0.5});
+    expect(dragCrop(full, "e", 0.3, 0)).toEqual(full);
+    expect(dragCrop(full, "n", 2, 0)).toEqual(full); // n ignores x
+    expect(dragCrop(full, "n", 0, 2)).toEqual({x: 0, y: 0.95, width: 1, height: 0.05});
+  });
+  it("moves the whole rectangle without leaving the picture", () => {
+    expect(dragCrop({x: 0.1, y: 0.1, width: 0.5, height: 0.5}, "move", 0.9, -0.3)).toEqual({x: 0.5, y: 0, width: 0.5, height: 0.5});
+  });
+});
+
+describe("detach audio", () => {
+  it("puts the clip's sound on a free audio track, same timing and source, and mutes the video; undo reverses it", () => {
+    const p0 = ok(fixture(), {type: "moveClips", clipIds: ["m1"], deltaFrames: 300}); // A1 is free under clip b
+    const r = applyCommand(p0, {type: "detachAudio", clipId: "b", newClipId: "b-snd", trackId: "unused"});
+    if (!r.ok) throw new Error(r.error);
+    const p = r.project;
+    const snd = locate(p, "b-snd")!;
+    expect(snd.track.id).toBe("A1");
+    expect(snd.clip).toMatchObject({assetId: "v", startFrame: 60, durationInFrames: 60, sourceStartUs: 4e6, sourceDurationUs: 2e6, speed: 1, muted: false});
+    expect(clipOf(p, "b").muted).toBe(true);
+    expect(clipKind(p, snd.clip, snd.track)).toBe("audio");
+    const h = new History();
+    h.record({label: "x", patches: r.patches, inverse: r.inverse, at: 0});
+    expect(JSON.stringify(h.undo(p))).toBe(JSON.stringify(p0));
+  });
+  it("makes a new audio track at the bottom when no audio track has room", () => {
+    const p = ok(fixture(), {type: "detachAudio", clipId: "a", newClipId: "a-snd", trackId: "A2"}); // m1 covers 0-60 on A1
+    expect(p.tracks.map((t) => t.id)).toEqual(["V1", "A1", "A2"]);
+    expect(locate(p, "a-snd")!.track.id).toBe("A2");
+  });
+  it("refuses stills, audio clips, silent video, a clip already detached and a locked track", () => {
+    let p = fixture();
+    p = {...p, assets: [...p.assets, {...p.assets[0]!, id: "silent", audioChannels: 0}]};
+    p.tracks[0]!.clips.push({...structuredClone(p.tracks[0]!.clips[0]!), id: "s", assetId: "silent", startFrame: 300});
+    p.tracks[0]!.clips.push({...structuredClone(p.tracks[0]!.clips[0]!), id: "img", assetId: "still", startFrame: 400});
+    expect(err(p, {type: "detachAudio", clipId: "s", newClipId: "x", trackId: "t"})).toMatch(/no sound/);
+    expect(err(p, {type: "detachAudio", clipId: "img", newClipId: "x", trackId: "t"})).toBeTruthy();
+    expect(err(p, {type: "detachAudio", clipId: "m1", newClipId: "x", trackId: "t"})).toBeTruthy();
+    const once = ok(p, {type: "detachAudio", clipId: "a", newClipId: "a-snd", trackId: "A2"});
+    expect(err(once, {type: "detachAudio", clipId: "a-snd", newClipId: "y", trackId: "t"})).toBeTruthy();
+    const locked = ok(p, {type: "setTrack", trackId: "V1", patch: {locked: true}});
+    expect(err(locked, {type: "detachAudio", clipId: "a", newClipId: "x", trackId: "t"})).toMatch(/locked/);
+  });
+  it("detached sound moves along audio tracks but not onto a video track", () => {
+    let p = ok(fixture(), {type: "detachAudio", clipId: "a", newClipId: "a-snd", trackId: "A2"});
+    p = ok(p, {type: "moveClips", clipIds: ["a-snd"], deltaFrames: 90});
+    expect(clipOf(p, "a-snd").startFrame).toBe(90);
+    p = ok(p, {type: "moveClips", clipIds: ["a-snd"], deltaFrames: 0, toTrackId: "A1"});
+    expect(locate(p, "a-snd")!.track.id).toBe("A1");
+    expect(err(p, {type: "moveClips", clipIds: ["a-snd"], deltaFrames: 400, toTrackId: "V1"})).toBeTruthy();
+  });
+});
+
+describe("speed", () => {
+  it("2x halves the clip, keeps its source and pulls the later clips on its track in", () => {
+    const p = ok(fixture(), {type: "setSpeed", clipId: "b", speed: 2});
+    expect(starts(p)).toEqual([["a", 0, 60], ["b", 60, 30], ["c", 90, 60]]);
+    expect(clipOf(p, "b")).toMatchObject({speed: 2, sourceStartUs: 4e6, sourceDurationUs: 2e6});
+    expect(starts(p, 1)).toEqual([["m1", 0, 60]]); // other tracks stay
+  });
+  it("0.5x doubles the clip and pushes the later clips out", () => {
+    const p = ok(fixture(), {type: "setSpeed", clipId: "a", speed: 0.5});
+    expect(starts(p)).toEqual([["a", 0, 120], ["b", 120, 60], ["c", 180, 60]]);
+  });
+  it("keeps gaps between later clips", () => {
+    let p = ok(fixture(), {type: "moveClips", clipIds: ["c"], deltaFrames: 40});
+    p = ok(p, {type: "setSpeed", clipId: "a", speed: 2});
+    expect(starts(p)).toEqual([["a", 0, 30], ["b", 30, 60], ["c", 130, 60]]);
+  });
+  it("refuses speeds outside 0.5x to 2x, a still and a locked track", () => {
+    let p = fixture();
+    expect(err(p, {type: "setSpeed", clipId: "a", speed: 2.5})).toBeTruthy();
+    expect(err(p, {type: "setSpeed", clipId: "a", speed: 0.25})).toBeTruthy();
+    expect(err(p, {type: "setSpeed", clipId: "a", speed: Number.NaN})).toBeTruthy();
+    p.tracks[0]!.clips.push({...structuredClone(p.tracks[0]!.clips[0]!), id: "img", assetId: "still", startFrame: 300});
+    expect(err(p, {type: "setSpeed", clipId: "img", speed: 2})).toMatch(/still/i);
+    p = ok(p, {type: "setTrack", trackId: "V1", patch: {locked: true}});
+    expect(err(p, {type: "setSpeed", clipId: "a", speed: 2})).toMatch(/locked/);
+  });
+  it("many speed changes (a slider drag) come back to the exact clip, and undo exactly", () => {
+    const p0 = fixture();
+    const h = new History();
+    let p = p0;
+    for (const speed of [1.05, 1.1, 1.35, 0.7, 0.55, 1.95, 1.3, 1]) {
+      const r = applyCommand(p, {type: "setSpeed", clipId: "a", speed});
+      if (!r.ok) throw new Error(r.error);
+      h.record({label: "Speed", patches: r.patches, inverse: r.inverse, coalesce: "speed", at: 0});
+      p = r.project;
+    }
+    expect(JSON.stringify(p)).toBe(JSON.stringify(p0));
+    p = ok(p, {type: "setSpeed", clipId: "a", speed: 1.5});
+    while (h.canUndo) p = h.undo(p)!;
+    expect(JSON.stringify(p)).toBe(JSON.stringify(p0));
+  });
+  it("a faster clip may trim out to the end of its source, measured at its speed", () => {
+    const p = ok(fixture(), {type: "setSpeed", clipId: "c", speed: 2}); // c: 6s into a 10s source, 4s left = 60 frames at 2x
+    expect(clampTrim(p, "c", "end", 1000)).toBe(30);
+  });
+});
+
+describe("text clips", () => {
+  const add = (p: Project, clipId: string, startFrame: number, trackId = `T-${clipId}`) => ok(p, {type: "addText", clipId, trackId, startFrame, durationInFrames: 90, content: "Hello"});
+  it("adds a title at a frame on a new text track at the top, with the default style", () => {
+    const p = add(fixture(), "t1", 30);
+    expect(p.tracks.map((t) => [t.id, t.type])).toEqual([["T-t1", "text"], ["V1", "video"], ["A1", "audio"]]);
+    const c = clipOf(p, "t1");
+    expect(c).toMatchObject({startFrame: 30, durationInFrames: 90, text: {content: "Hello", fontFamily: "Noto Sans Bengali", fontSize: 64, color: "#ffffff", alignment: "center"}});
+    expect(c.assetId).toBeUndefined();
+  });
+  it("reuses a text track with room, and makes another when the time is taken", () => {
+    let p = add(fixture(), "t1", 0);
+    p = add(p, "t2", 200, "unused");
+    expect(locate(p, "t2")!.track.id).toBe("T-t1");
+    p = add(p, "t3", 50, "T-new");
+    expect(locate(p, "t3")!.track.id).toBe("T-new");
+    expect(p.tracks[0]!.id).toBe("T-new");
+  });
+  it("updates the style, removes optional parts with null, and refuses bad values", () => {
+    let p = add(fixture(), "t1", 0);
+    p = ok(p, {type: "updateText", clipId: "t1", patch: {content: "নমস্কার", fontSize: 120, color: "#ffcc00", alignment: "left", background: "#000000", stroke: {color: "#000000", width: 4}, shadow: {color: "rgba(0,0,0,0.6)", blur: 12, x: 0, y: 4}, enterPreset: "typewriter", exitPreset: "fade"}});
+    expect(clipOf(p, "t1").text).toMatchObject({content: "নমস্কার", fontSize: 120, alignment: "left", background: "#000000", stroke: {width: 4}, enterPreset: "typewriter"});
+    p = ok(p, {type: "updateText", clipId: "t1", patch: {background: null, stroke: null, shadow: null, enterPreset: "none"}});
+    const t = clipOf(p, "t1").text!;
+    expect(["background" in t, "stroke" in t, "shadow" in t, t.enterPreset]).toEqual([false, false, false, "none"]);
+    for (const patch of [{color: "red"}, {fontSize: 2}, {fontSize: 1000}, {enterPreset: "spin"}, {stroke: {color: "#000000", width: -1}}, {background: "blue"}, {fontFamily: ""}, {lineHeight: 0}]) {
+      expect(err(p, {type: "updateText", clipId: "t1", patch} as Command)).toBeTruthy();
+    }
+    expect(err(fixture(), {type: "updateText", clipId: "a", patch: {content: "x"}})).toMatch(/not a title/);
+  });
+  it("titles trim freely, split keeping the text, and stay on text tracks", () => {
+    let p = add(fixture(), "t1", 100);
+    p = ok(p, {type: "trimClip", clipId: "t1", edge: "start", deltaFrames: -60});
+    expect(clipOf(p, "t1")).toMatchObject({startFrame: 40, durationInFrames: 150, sourceStartUs: 0});
+    p = ok(p, {type: "splitClips", frame: 100, clipIds: ["t1"], newIds: {t1: "t1b"}});
+    expect(clipOf(p, "t1b").text!.content).toBe("Hello");
+    expect(err(p, {type: "moveClips", clipIds: ["t1"], deltaFrames: 400, toTrackId: "V1"})).toBeTruthy();
+    expect(err(p, {type: "moveClips", clipIds: ["a"], deltaFrames: 400, toTrackId: "T-t1"})).toBeTruthy();
+    expect(err(p, {type: "setSpeed", clipId: "t1", speed: 2})).toBeTruthy();
+  });
+});
+
+describe("transitions", () => {
+  const fade = (d: number) => ({kind: "fade" as const, durationInFrames: d});
+  const tr = (p: Project, id: string) => clipOf(p, id).transitionOut;
+  it("adds a transition between touching clips, up to what the handles, the clips and 2 seconds allow", () => {
+    const p = fixture(); // a: 2-4s of 10s, b: 4-6s, 2s clips at 30fps
+    expect(maxTransition(p, "a")).toBe(60);
+    const q = ok(p, {type: "setTransition", clipId: "a", transition: fade(15)});
+    expect(tr(q, "a")).toEqual(fade(15));
+    expect(err(p, {type: "setTransition", clipId: "a", transition: fade(61)})).toMatch(/at most/);
+    expect(err(p, {type: "setTransition", clipId: "a", transition: fade(1)})).toBeTruthy();
+    expect(ok(q, {type: "setTransition", clipId: "a", transition: null}).tracks[0]!.clips[0]).not.toHaveProperty("transitionOut");
+  });
+  it("needs untrimmed footage on both sides of the cut", () => {
+    const p = fixture();
+    p.tracks[0]!.clips[1]!.sourceStartUs = 0; // b starts at the very start of its source: nothing before its in point
+    expect(maxTransition(p, "a")).toBe(0);
+    expect(err(p, {type: "setTransition", clipId: "a", transition: fade(10)})).toMatch(/footage/);
+    p.tracks[0]!.clips[1]!.sourceStartUs = 100_000; // 3 frames of handle: up to 2 * 3 + 1 frames
+    expect(maxTransition(p, "a")).toBe(7);
+  });
+  it("refuses a clip with a gap after it, the last clip, sound and titles", () => {
+    let p = ok(fixture(), {type: "moveClips", clipIds: ["c"], deltaFrames: 10});
+    expect(err(p, {type: "setTransition", clipId: "b", transition: fade(10)})).toMatch(/right after/);
+    expect(err(p, {type: "setTransition", clipId: "c", transition: fade(10)})).toMatch(/right after/);
+    expect(err(p, {type: "setTransition", clipId: "m1", transition: fade(10)})).toMatch(/pictures/);
+    p = ok(p, {type: "addText", clipId: "t1", trackId: "T1", startFrame: 0, durationInFrames: 30, content: "x"});
+    p = ok(p, {type: "addText", clipId: "t2", trackId: "unused", startFrame: 30, durationInFrames: 30, content: "y"});
+    expect(err(p, {type: "setTransition", clipId: "t1", transition: fade(10)})).toMatch(/pictures/);
+  });
+  it("edits that pull the clips apart remove the transition; ones that shorten a clip shrink it; undo brings it back", () => {
+    const p0 = ok(fixture(), {type: "setTransition", clipId: "a", transition: fade(60)});
+    const apart = applyCommand(p0, {type: "moveClips", clipIds: ["b", "c"], deltaFrames: 30});
+    if (!apart.ok) throw new Error(apart.error);
+    expect(tr(apart.project, "a")).toBeUndefined();
+    const h = new History();
+    h.record({label: "x", patches: apart.patches, inverse: apart.inverse, at: 0});
+    expect(JSON.stringify(h.undo(apart.project))).toBe(JSON.stringify(p0));
+    const shorter = ok(p0, {type: "setSpeed", clipId: "b", speed: 2}); // b is now 30 frames long
+    expect(tr(shorter, "a")).toEqual(fade(30));
+    expect(tr(ok(p0, {type: "deleteClips", clipIds: ["b"]}), "a")).toBeUndefined();
+  });
+  it("a clip between two transitions can have both at full length; trimming it shrinks the one before and drops the one after", () => {
+    let p = ok(fixture(), {type: "setTransition", clipId: "a", transition: fade(60)});
+    p = ok(p, {type: "setTransition", clipId: "b", transition: fade(60)}); // b's 60 frames: 30 incoming, 30 outgoing
+    expect([tr(p, "a"), tr(p, "b")]).toEqual([fade(60), fade(60)]);
+    p = ok(p, {type: "trimClip", clipId: "b", edge: "end", deltaFrames: -20});
+    expect([tr(p, "a"), tr(p, "b")]).toEqual([fade(40), undefined]);
   });
 });
