@@ -35,7 +35,7 @@ Local, project-folder editor with no subscription. The preview and the export us
 
 ## Brand Commitments
 
-Name: Studio. The UI identity ("Metro line": colour means media type, green is the user's own line, Fira Sans and Fira Mono) was approved by the user on 2026-11-11 and is recorded in DESIGN.md.
+Name: Studio. The UI identity ("Metro line": colour means media type, gold is the user's own line, Fira Sans and Fira Mono) was approved by the user on 2026-11-11 and is recorded in DESIGN.md. The accent changed from green to gold (stills to cyan, warnings to orange) at the user's request on 2026-11-11.
 
 ## Evidence on Hand
 

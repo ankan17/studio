@@ -21,6 +21,7 @@ export const Trash = ({size = 16}: P) => base(<><path d="M5 7h14" /><path d="M9 
 export const Film = ({size = 16}: P) => base(<><rect x="4" y="4" width="16" height="16" rx="2.5" /><path d="M4 9h3M4 15h3M17 9h3M17 15h3M8 4v16M16 4v16" /></>, size);
 export const Music = ({size = 16}: P) => base(<><path d="M9 18V6l10-2v12" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="16.5" cy="16" r="2.5" /></>, size);
 export const Picture = ({size = 16}: P) => base(<><rect x="4" y="5" width="16" height="14" rx="2.5" /><circle cx="9" cy="10" r="1.5" /><path d="M20 16l-4.5-4.5L7 19" /></>, size);
+export const Check = ({size = 16}: P) => base(<path d="M5 12.5l4.5 4.5L19 7.5" />, size);
 export const Close = ({size = 16}: P) => base(<path d="M6 6l12 12M18 6L6 18" />, size);
 export const Warning = ({size = 16}: P) => base(<><path d="M12 4l9 16H3z" /><path d="M12 10v4M12 17.2v.1" /></>, size);
 export const Link = ({size = 16}: P) => base(<><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></>, size);

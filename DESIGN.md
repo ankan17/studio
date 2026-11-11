@@ -12,15 +12,15 @@ colors:
   ink-2: "#b8bec8"
   ink-3: "#959ca7"
   frame: "#05070b"
-  go: "#4bc680"
-  go-hi: "#5fd290"
-  go-ink: "#0a1a10"
-  go-text: "#72d699"
-  go-soft: "rgb(75 198 128 / 0.14)"
+  go: "#deaf44"
+  go-hi: "#ebbc50"
+  go-ink: "#1f1400"
+  go-text: "#eac15e"
+  go-soft: "rgb(222 175 68 / 0.15)"
   video: "#639be1"
   audio: "#ad87d7"
-  still: "#e6c465"
-  warn: "#f4a859"
+  still: "#39cbcc"
+  warn: "#fb9d47"
   danger: "#ef6661"
 typography:
   title:
@@ -170,36 +170,36 @@ components:
 
 **Creative North Star: "The Metro Line"**
 
-The edit is a route through time. Every track is a coloured rail, every clip a block riding on it, every cut a station tick, and a cut that lines up across tracks becomes an interchange ring. Colour in this system is a line, not a mood: it tells you what kind of media something is, and it says the same thing in the media panel, the inspector, the timeline and the dashboard. Green is "your line": the action that moves your work forward, what you have selected, and where you are.
+The edit is a route through time. Every track is a coloured rail, every clip a block riding on it, every cut a station tick, and a cut that lines up across tracks becomes an interchange ring. Colour in this system is a line, not a mood: it tells you what kind of media something is, and it says the same thing in the media panel, the inspector, the timeline and the dashboard. Gold is "your line": the action that moves your work forward, what you have selected, and where you are.
 
 The chrome is midnight-enamel graphite, OKLCH neutrals stepped in lightness at hue 261 to 267 with chroma around 0.016 to 0.022, so the panels read as dark tinted enamel rather than grey plastic. The footage is the brightest thing on screen; the interface frames it with hairline borders, tonal layering and small radii. Density is that of a working tool: 13px body, 28px controls, 10px gutters between panels.
 
 Everything must stay light on an 8GB Mac. There is no blur and no glow, and only one authored entrance (a dialog). Frame stepping and playhead travel are never animated; the picture is the motion.
 
 **Key Characteristics:**
-- Media type colour is a line: video blue, audio purple, stills and titles yellow, used identically in roundels, clip bars, rails and project cards.
-- Green is reserved for your line: the primary action, selection, the playhead, and the state of your own work (saved, on the timeline, progress).
+- Media type colour is a line: video blue, audio purple, stills and titles cyan, used identically in roundels, clip bars, rails and project cards.
+- Gold is reserved for your line: the primary action, selection, the playhead, and the state of your own work (on the timeline, progress).
 - Hue-262 graphite neutrals in four tonal steps (ground, surface, raised, hover), separated by hairlines, not shadows.
 - Fira Sans for words, Fira Mono for measurements, Noto Sans Bengali behind both.
 - Every text colour passes WCAG AA on every surface it sits on.
 
 ## Colors
 
-A dark, hue-tinted graphite field with three media-line colours and one green for your own line; every hue is mid-lightness and equal chroma (about 0.12), so no line shouts over another.
+A dark, hue-tinted graphite field with three media-line colours and one gold for your own line; every hue is mid-lightness and equal chroma (about 0.12), so no line shouts over another.
 
 ### Primary
-- **Your Line Green** (go): the primary button, the play button, the playhead and its "you are here" dot, the selected clip and tile outline (2px), the add-to-timeline button, the drop-to-import overlay. Text on it is **Depot Ink** (go-ink) at 8.3:1.
-- **Green Hi** (go-hi): hover state of every green fill.
-- **Signal Green Text** (go-text): green as text on dark (Retry, Make preview), the focus ring (2px outline, 2px offset) and pressed icon buttons. At least 8.3:1 on every surface.
-- **Green Wash** (go-soft): 14% green behind pressed icon buttons and the chosen format card in the New project dialog.
+- **Your Line Gold** (go): the primary button, the play button, the playhead and its "you are here" dot, the selected clip and tile outline (2px), the add-to-timeline button, the drop-to-import overlay. Text on it is **Depot Ink** (go-ink) at 8.9:1.
+- **Gold Hi** (go-hi): hover state of every gold fill.
+- **Brass Text** (go-text): gold as text on dark (Retry, Make preview), the focus ring (2px outline, 2px offset) and pressed icon buttons. At least 8.7:1 on every surface.
+- **Gold Wash** (go-soft): 15% gold behind pressed icon buttons and the chosen format card in the New project dialog.
 
 ### Secondary
 - **Video Line Blue** (video): the video roundel "V", video rails, the 3px bar under video clip blocks.
 - **Audio Line Purple** (audio): the audio roundel "A", audio rails, clip bars and waveform strokes.
-- **Stills Line Yellow** (still): the image roundel "I" and image clip bars; reserved for titles when they arrive.
+- **Stills Line Cyan** (still): the image roundel "I" and image clip bars; reserved for titles when they arrive.
 
 ### Tertiary
-- **Amber Caution** (warn): unsaved and saving dots, the memory readout near its budget, missing-file tiles, the recovery notice (10% fill, 30% border).
+- **Orange Caution** (warn): unsaved and saving dots (saved is an ink-3 check, never a colour, so it cannot be mistaken for them), the memory readout near its budget, missing-file tiles, the recovery notice (10% fill, 30% border).
 - **Signal Red** (danger): could-not-save, errors, failed jobs, destructive hover on Trash.
 
 ### Neutral
@@ -217,7 +217,7 @@ A dark, hue-tinted graphite field with three media-line colours and one green fo
 ### Named Rules
 **The Colour Is a Line Rule.** A media type has exactly one colour and one letter (V, A, I), and every surface that shows that type uses both, from the media tile roundel to the timeline rail to the dashboard card. Colour never decorates; it identifies.
 
-**The Your Line Rule.** Green belongs to the user's own route: the primary action, selection, the playhead, and the state of their work (saved, on the timeline, progress). Sliders, segmented controls and secondary buttons stay neutral; a slider fills with ink-2, not green.
+**The Your Line Rule.** Gold belongs to the user's own route: the primary action, selection, the playhead, and the state of their work (on the timeline, progress). Sliders, segmented controls and secondary buttons stay neutral; a slider fills with ink-2, not gold.
 
 **The AA Everywhere Rule.** Every text colour passes 4.5:1 on every surface it can sit on, ink-3 on hover included. A new text colour that fails on hover enamel does not ship.
 
@@ -272,11 +272,11 @@ Small, consistent radii from a single family: 6px controls, 8px panels and proje
 Quiet, compact and tactile.
 - **Shape:** gently rounded (6px), 28px tall, 12px side padding, 6px icon gap.
 - **Default:** raised enamel fill, line border, label type at 500.
-- **Go (primary):** green fill, no border, depot ink text at 600; 32 to 36px tall where it is the page's main action. One per view.
+- **Go (primary):** gold fill, no border, depot ink text at 600; 32 to 36px tall where it is the page's main action. One per view.
 - **Ghost:** transparent, ink-2 text, brightening to ink on hover.
 - **Hover / Active:** fill steps to hover (or go-hi), 150ms ease-out; press scales to 0.97 in 120ms. Disabled at 45% opacity. Reduced motion removes the transitions.
-- **Icon button:** 30px square, ink-2 icon, hover fill; pressed (aria-pressed) takes the green wash with go-text. Press scales to 0.94.
-- **Play button:** a 38px green circle at the centre of the transport, the largest green mark in the editor.
+- **Icon button:** 30px square, ink-2 icon, hover fill; pressed (aria-pressed) takes the gold wash with go-text. Press scales to 0.94.
+- **Play button:** a 38px gold circle at the centre of the transport, the largest gold mark in the editor.
 
 ### Segmented control
 - **Style:** a ground well (7px radius, line-soft border, 2px padding) of equal-width 24px options at 12px/500 in ink-2.
@@ -289,7 +289,7 @@ Quiet, compact and tactile.
 
 ### Cards / Containers
 - **Panel:** surface fill, 1px line-soft border, 8px radius.
-- **Media tile:** 16:10 raised frame with a line-soft ring and 6px radius; roundel top-left, duration badge bottom-right, a green dot top-right when the asset is on the timeline, a 24px green add button bottom-left, a 3px progress bar along the bottom while preparing. Selected: 2px go outline offset 1px.
+- **Media tile:** 16:10 raised frame with a line-soft ring and 6px radius; roundel top-left, duration badge bottom-right, a gold dot top-right when the asset is on the timeline, a 24px gold add button bottom-left, a 3px progress bar along the bottom while preparing. Selected: 2px go outline offset 1px.
 - **Project card:** 16:9 surface frame, 8px radius, ring brightening from line-soft to line on hover; below it the name, the media roundels at 14px, and Fira Mono dimensions. Card actions appear on hover or focus.
 - **Empty state:** a dashed line border, 8px radius, a heading and one sentence of body that says what to do.
 
@@ -297,7 +297,7 @@ Quiet, compact and tactile.
 An 18px circle filled with the media type's line colour, carrying its letter (V, A, I) in 10px/600 ground ink. The same mark identifies a tile, a track, the inspected clip and (at 14px) the kinds of media inside a project card.
 
 ### Route Timeline (signature)
-Each track is a rail in its line colour; clips are blocks tinted 20% of that colour into surface, with a hairline edge, a 50% thumbnail strip, an 11px name and a 3px line-coloured bar along the bottom. Inner cuts are ink station ticks; a frame cut on two or more tracks is an interchange ring across them. The playhead is a 2px green line with a 14px green dot on the ruler and a green Fira Mono timecode flag; the ruler marks step aside around it. Nothing on the timeline animates: the playhead jumps to each frame.
+Each track is a rail in its line colour; clips are blocks tinted 20% of that colour into surface, with a hairline edge, a 50% thumbnail strip, an 11px name and a 3px line-coloured bar along the bottom. Inner cuts are ink station ticks; a frame cut on two or more tracks is an interchange ring across them. The playhead is a 2px gold line with a 14px gold dot on the ruler and a gold Fira Mono timecode flag; the ruler marks step aside around it. Nothing on the timeline animates: the playhead jumps to each frame.
 
 ### Motion
 One authored entrance: the dialog grows from 97% in 180ms on ease-out `cubic-bezier(0.23, 1, 0.32, 1)` while its scrim fades in 150ms. Everything else is a 150ms colour transition or a 120ms press scale. Reduced motion disables the entrance, the scrim fade and button transitions. Nothing in the editor animates continuously: a tile without a thumbnail shows a static "No preview" placeholder.
@@ -305,8 +305,8 @@ One authored entrance: the dialog grows from 97% in 180ms on ease-out `cubic-bez
 ## Do's and Don'ts
 
 ### Do:
-- **Do** give every media type its one colour and letter everywhere it appears: video blue, audio purple, stills yellow.
-- **Do** keep green for the primary action, selection, the playhead and the state of the user's own work.
+- **Do** give every media type its one colour and letter everywhere it appears: video blue, audio purple, stills cyan.
+- **Do** keep gold for the primary action, selection, the playhead and the state of the user's own work.
 - **Do** set every measurement (timecode, duration, dimensions, fps, dB, percent) in Fira Mono with tabular figures; set counts and dates in Fira Sans with tabular figures.
 - **Do** build depth from the ground, surface, raised, hover steps and hairline borders.
 - **Do** check every new text colour against hover enamel (#222833) for at least 4.5:1.
@@ -317,5 +317,5 @@ One authored entrance: the dialog grows from 97% in 180ms on ease-out `cubic-bez
 - **Don't** add always-running animation to the editor, or animate frame stepping and playhead travel.
 - **Don't** add a second entrance animation; the dialog's is the only one.
 - **Don't** use uppercase anywhere but the track tag.
-- **Don't** use colour decoratively; a hue that is not a media line, green, amber or red has no job here.
+- **Don't** use colour decoratively; a hue that is not a media line, gold, orange or red has no job here.
 - **Don't** use pure black; the letterbox is #05070b.

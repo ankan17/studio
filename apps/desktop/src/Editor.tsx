@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react";
 import {useEditor, type SaveState} from "./editorStore";
-import {Back, Warning} from "./icons";
+import {Back, Check, Warning} from "./icons";
 import {Hud} from "./Hud";
 import {Inspector} from "./Inspector";
 import {MediaPanel} from "./MediaPanel";
@@ -10,8 +10,9 @@ import {SequenceStrip} from "./SequenceStrip";
 import {Stage} from "./Stage";
 import {Transport} from "./Transport";
 
-const SAVE: Record<SaveState, {label: string; dot: string}> = {
-  saved: {label: "Saved", dot: "bg-go"},
+// Saved is a quiet ink tick, not a colour: gold would sit too close to the orange "unsaved" dot.
+const SAVE: Record<SaveState, {label: string; dot: string | null}> = {
+  saved: {label: "Saved", dot: null},
   dirty: {label: "Unsaved changes", dot: "bg-warn"},
   saving: {label: "Saving…", dot: "bg-warn"},
   error: {label: "Could not save", dot: "bg-danger"},
@@ -69,7 +70,7 @@ export function Editor() {
           onBlur={(e) => !e.target.value.trim() && update((p) => void (p.name = "Untitled"))}
         />
         <span className="no-drag flex items-center gap-1.5 text-caption text-ink-2" title={error ?? undefined} data-testid="save-state">
-          <span className={`h-1.5 w-1.5 rounded-full ${save.dot}`} />
+          {save.dot ? <span className={`h-1.5 w-1.5 rounded-full ${save.dot}`} /> : <span className="-mx-0.5 text-ink-3"><Check size={12} /></span>}
           {save.label}
         </span>
         <div className="flex-1" />

@@ -2,7 +2,7 @@
 
 /* Studio design system: "Metro line".
    The edit is a route through time. Neutrals are midnight-enamel graphite tinted toward hue 262; colour means media type
-   everywhere (video blue, audio purple, stills and titles yellow); green is "your line": the main action and the playhead.
+   everywhere (video blue, audio purple, stills and titles cyan); gold is "your line": the main action and the playhead.
    Values are OKLCH-derived and every text colour passes WCAG AA on every surface (see DESIGN.md). */
 
 /* ---- bundled faces (SIL OFL, licences beside the files) */
@@ -31,19 +31,19 @@
   --color-frame: #05070b; /* letterbox around the picture; never pure black */
 
   /* your line: primary action, selection, playhead */
-  --color-go: #4bc680;
-  --color-go-hi: #5fd290;
-  --color-go-ink: #0a1a10; /* text on go, 8.3:1 */
-  --color-go-text: #72d699; /* green text on dark */
-  --color-go-soft: rgb(75 198 128 / 0.14);
+  --color-go: #deaf44; /* brass gold, oklch(0.78 0.12 82) */
+  --color-go-hi: #ebbc50;
+  --color-go-ink: #1f1400; /* text on go, 8.9:1 */
+  --color-go-text: #eac15e; /* gold text on dark, 8.7:1 on hover */
+  --color-go-soft: rgb(222 175 68 / 0.15);
 
   /* lines: media types */
   --color-video: #639be1;
   --color-audio: #ad87d7;
-  --color-still: #e6c465;
+  --color-still: #39cbcc;
 
   /* state */
-  --color-warn: #f4a859;
+  --color-warn: #fb9d47; /* orange, kept clear of gold and of danger red */
   --color-danger: #ef6661;
 
   --font-sans: "Fira Sans", "Noto Sans Bengali UI", system-ui, sans-serif;
@@ -90,7 +90,7 @@ body {
 }
 
 ::selection {
-  background: rgb(75 198 128 / 0.32);
+  background: rgb(222 175 68 / 0.30);
 }
 
 * {
