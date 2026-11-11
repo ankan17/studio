@@ -1,12 +1,227 @@
 @import "tailwindcss";
 
+/* Design tokens. One warm-graphite neutral ramp, one vermilion accent, three clip hues. */
+@theme {
+  --color-bg: #0e0f11;
+  --color-panel: #141518;
+  --color-raised: #1a1b1f;
+  --color-hover: #212227;
+  --color-line: rgb(255 255 255 / 0.07);
+  --color-line-strong: rgb(255 255 255 / 0.13);
+  --color-ink: #ecedf0;
+  --color-dim: #9b9da8;
+  --color-faint: #666874;
+  --color-accent: #ff6a3d;
+  --color-accent-hi: #ff8661;
+  --color-accent-soft: rgb(255 106 61 / 0.14);
+  --color-video: #6577ff;
+  --color-audio: #2dbf9a;
+  --color-still: #e6a93b;
+  --color-danger: #ff5d6c;
+  --color-warn: #f2b84b;
+  --font-sans: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, Menlo, monospace;
+  --radius-panel: 10px;
+}
+
 :root {
   color-scheme: dark;
 }
 
+html, body, #react-root {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  background: #1f2428;
-  color: #fff;
-  font-family: system-ui, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+}
+
+/* In the base layer so Tailwind's utilities (text-accent, text-dim, ...) can override them. */
+@layer base {
+  button {
+    font: inherit;
+    color: inherit;
+    cursor: default;
+  }
+  input, select {
+    font: inherit;
+    color: inherit;
+    user-select: text;
+  }
+}
+
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+@layer components {
+  .panel {
+    background: var(--color-panel);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+  }
+  .eyebrow {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 11px;
+    border-radius: 7px;
+    background: var(--color-raised);
+    border: 1px solid var(--color-line-strong);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background 0.12s, border-color 0.12s, transform 0.06s;
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--color-hover);
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(0.5px);
+  }
+  .btn:disabled {
+    opacity: 0.4;
+  }
+  .btn-primary {
+    background: var(--color-accent);
+    border-color: transparent;
+    color: #1a0b05;
+    font-weight: 600;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 1px 8px rgb(255 106 61 / 0.25);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-accent-hi);
+  }
+  .btn-ghost {
+    background: transparent;
+    border-color: transparent;
+  }
+  .btn-danger {
+    color: var(--color-danger);
+  }
+  .icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    color: var(--color-dim);
+    transition: background 0.12s, color 0.12s;
+  }
+  .icon-btn:hover:not(:disabled) {
+    background: var(--color-hover);
+    color: var(--color-ink);
+  }
+  .icon-btn:disabled {
+    opacity: 0.3;
+  }
+  .btn:focus-visible, .icon-btn:focus-visible, .field:focus-visible, .seg button:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+
+  .field {
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 7px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-line-strong);
+    font-size: 12px;
+    outline: none;
+  }
+  .field:focus {
+    border-color: var(--color-accent);
+  }
+  .field::placeholder {
+    color: var(--color-faint);
+  }
+
+  .seg {
+    display: inline-flex;
+    padding: 2px;
+    gap: 1px;
+    border-radius: 8px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-line);
+  }
+  .seg button {
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--color-dim);
+  }
+  .seg button:hover {
+    color: var(--color-ink);
+  }
+  .seg button[aria-pressed="true"] {
+    background: var(--color-hover);
+    color: var(--color-ink);
+    box-shadow: 0 0 0 1px var(--color-line-strong);
+  }
+
+  .kbd {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-line-strong);
+    color: var(--color-dim);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.09) 50%, transparent 70%) 0 0 / 200% 100%, var(--color-raised);
+  animation: shimmer 1.6s linear infinite;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+}
+.rise {
+  animation: rise 0.18s ease-out;
 }

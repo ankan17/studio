@@ -8,6 +8,26 @@ export const IPC = {
   metrics: "studio:metrics",
   flushRequest: "studio:flush-request", // main -> renderer: save now, the window is closing
   flushDone: "studio:flush-done",
+  media: {
+    import: "media:import",
+    importPaths: "media:import-paths",
+    relink: "media:relink",
+    ensure: "media:ensure",
+    cancel: "media:cancel",
+    readPeaks: "media:read-peaks",
+    deleteAssets: "media:delete-assets",
+    event: "media:event", // main -> renderer
+  },
+  worker: {
+    ready: "worker:ready",
+    job: "worker:job", // main -> worker window
+    cancel: "worker:cancel",
+    meta: "worker:meta",
+    progress: "worker:progress",
+    writeAt: "worker:write-at",
+    commit: "worker:commit",
+    done: "worker:done",
+  },
   projects: {
     list: "projects:list",
     create: "projects:create",
@@ -39,6 +59,77 @@ export const Req = {
   }),
 } as const;
 
+const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
+const ext = z.enum(["mp4", "mov", "m4v", "mp3", "m4a", "wav", "jpg", "jpeg", "png"]);
+const assetType = z.enum(["video", "audio", "image"]);
+const assetRef = z.object({sha256, ext, type: assetType, metaMissing: z.boolean()});
+const cacheKind = z.enum(["proxy.mp4", "filmstrip.jpg", "thumb.jpg", "peaks"]);
+const jobId = z.string().uuid();
+
+/** What Mediabunny reads from a file. Sent by the worker window, so it is validated like any other input. */
+export const MediaMetaSchema = z.object({
+  durationUs: z.number().int().nonnegative().max(1e14).optional(),
+  fps: z.number().positive().max(1000).optional(),
+  width: z.number().int().positive().max(16384).optional(), // as displayed, after rotation
+  height: z.number().int().positive().max(16384).optional(),
+  rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0),
+  codec: z.string().max(40).optional(),
+  audioChannels: z.number().int().nonnegative().max(64).optional(),
+  hdr: z.boolean().optional(),
+});
+export type MediaMeta = z.infer<typeof MediaMetaSchema>;
+
+export const STAGES = ["meta", "proxy", "thumbs", "peaks"] as const;
+export type Stage = (typeof STAGES)[number];
+
+// Media requests carry a project id; media paths are never accepted except dropped files (validated in main).
+export const MediaReq = {
+  import: z.object({projectId: id}),
+  importPaths: z.object({projectId: id, paths: z.array(z.string().min(1).max(4096)).min(1).max(200)}),
+  relink: z.object({projectId: id, sha256, type: assetType}),
+  ensure: z.object({projectId: id, items: z.array(assetRef).max(2000)}),
+  cancel: z.object({projectId: id, sha256: sha256.optional()}),
+  peaks: z.object({projectId: id, sha256}),
+  remove: z.object({projectId: id, items: z.array(z.object({sha256, ext})).max(2000)}),
+} as const;
+
+// Messages from the hidden worker window. Main hands out job ids, so these are only accepted for a running job.
+const MAX_WRITE = 16 * 1024 * 1024;
+export const WorkerReq = {
+  meta: z.object({jobId, meta: MediaMetaSchema}),
+  progress: z.object({jobId, stage: z.enum(STAGES), fraction: z.number().min(0).max(1)}),
+  writeAt: z.object({jobId, kind: cacheKind, position: z.number().int().nonnegative().max(8 * 1024 ** 3), data: z.instanceof(Uint8Array).refine((b) => b.byteLength <= MAX_WRITE, "Write too large")}),
+  commit: z.object({jobId, kind: cacheKind}),
+  done: z.object({jobId, error: z.string().max(2000).optional()}),
+} as const;
+
+export type WorkerJob = {
+  jobId: string;
+  sha256: string;
+  type: "video" | "audio" | "image";
+  srcUrl: string;
+  /** Which derived files are still missing; the worker produces only these. */
+  needs: {proxy: boolean; thumb: boolean; filmstrip: boolean; peaks: boolean};
+};
+
+export type ImportResult = {
+  sha256: string;
+  ext: string;
+  relativePath: string;
+  type: "video" | "audio" | "image";
+  name: string;
+  sizeBytes: number;
+  existed: boolean;
+};
+export type ImportOutcome = {imported: ImportResult[]; errors: {name: string; message: string}[]};
+
+export type MediaEvent =
+  | {kind: "meta"; projectId: string; sha256: string; meta: MediaMeta}
+  | {kind: "progress"; projectId: string; sha256: string; stage: Stage; fraction: number}
+  | {kind: "done"; projectId: string; sha256: string}
+  | {kind: "error"; projectId: string; sha256: string; message: string}
+  | {kind: "cancelled"; projectId: string; sha256: string};
+
 export type CreateRequest = z.infer<typeof Req.create>;
 
 export type ProjectCard = {
@@ -51,18 +142,37 @@ export type ProjectCard = {
   backgroundColor: string;
   thumbnailUrl: string | null;
 };
-export type OpenedProject = {project: Project; recovered: boolean};
+/** `baseUrl` is the media:// URL of the project folder; assets, proxies and thumbnails are served beneath it. */
+export type OpenedProject = {project: Project; recovered: boolean; baseUrl: string};
 
 export type MediaHandle = {name: string; url: string; sizeMB: number};
 export type MemoryMetrics = {totalMB: number; swapMB: number; byProcess: Record<string, number>};
 
 export type StudioApi = {
+  /** True only for development runs started with STUDIO_E2E=1 (adds a test hook, see App.tsx). */
+  isE2E: boolean;
   /** Main shows the native open dialog, allows that folder for media:// and returns a handle. Renderer never supplies a path. */
   openMedia: () => Promise<MediaHandle | null>;
   onMetrics: (listener: (m: MemoryMetrics) => void) => () => void;
   /** Main asks the renderer to save before the window closes; the renderer must call flushDone() afterwards. */
   onFlushRequest: (listener: () => void) => () => void;
   flushDone: () => Promise<void>;
+  media: {
+    /** Native multi-select dialog in main, then copy into the project. Resolves with nothing imported if cancelled. */
+    import: (projectId: string) => Promise<ImportOutcome>;
+    /** Files dropped from Finder. Main re-validates every path (type, regular file, not inside app data). */
+    importPaths: (projectId: string, paths: string[]) => Promise<ImportOutcome>;
+    /** Pick a replacement file for a missing asset (native dialog). Null if cancelled. */
+    relink: (projectId: string, sha256: string, type: "video" | "audio" | "image") => Promise<ImportResult | null>;
+    /** Queue any missing proxies, thumbnails and peaks. Returns the hashes whose source file is gone and those that already have a proxy. */
+    ensure: (projectId: string, items: {sha256: string; ext: string; type: "video" | "audio" | "image"; metaMissing: boolean}[]) => Promise<{missing: string[]; proxies: string[]}>;
+    cancel: (projectId: string, sha256?: string) => Promise<void>;
+    readPeaks: (projectId: string, sha256: string) => Promise<Uint8Array | null>;
+    deleteAssets: (projectId: string, items: {sha256: string; ext: string}[]) => Promise<void>;
+    onEvent: (listener: (e: MediaEvent) => void) => () => void;
+    /** Path of a dropped File (the renderer has no access to paths otherwise). */
+    pathOf: (file: File) => string;
+  };
   projects: {
     list: () => Promise<ProjectCard[]>;
     create: (req: CreateRequest) => Promise<Project>;

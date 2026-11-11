@@ -28,6 +28,12 @@ export const AssetSchema = z.object({
   rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0),
   sha256: z.string(),
   proxyPath: z.string().optional(),
+  // Added in M2 (all optional, so v1 projects still load): what the user sees and what the media panel filters on.
+  name: z.string().optional(), // original file name
+  sizeBytes: int.nonnegative().optional(),
+  codec: z.string().optional(),
+  audioChannels: int.nonnegative().optional(),
+  hdr: z.boolean().optional(),
 });
 
 export const TransitionSchema = z.object({
@@ -115,3 +121,4 @@ export type Fps = Project["fps"];
 
 export const createProject = (id: string, name: string, format: {width: number; height: number; fps: Fps}): Project =>
   ProjectSchema.parse({schemaVersion: SCHEMA_VERSION, id, name, ...format});
+export * from "./timeline";

@@ -1,10 +1,11 @@
-import {ProjectStore} from "@studio/project-store";
+import {cacheFile, fileExists, findMissing, importAssetFile, ImportError, ProjectStore, removeAssetFiles, sweepStaleImports, type ImportedFile} from "@studio/project-store";
 import {app, BrowserWindow, dialog, ipcMain, session, shell, type IpcMainInvokeEvent} from "electron";
 import fs from "node:fs";
 import path from "node:path";
-import {IPC, Req, type MediaHandle, type ProjectCard} from "./ipc";
+import {IPC, MediaReq, Req, type ImportOutcome, type MediaHandle, type ProjectCard} from "./ipc";
 import type {z} from "zod";
 import {allowMediaRoot, handleMediaProtocol, mediaUrl, registerMediaScheme} from "./media-protocol";
+import {MediaService} from "./media-service";
 import {startMemorySampler} from "./memory-sampler";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
@@ -12,8 +13,10 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 
 registerMediaScheme();
 
+const E2E_ARGS = process.env.STUDIO_E2E === "1" && !app.isPackaged ? ["--studio-e2e"] : [];
 let mainWindow: BrowserWindow | null = null;
 let store: ProjectStore;
+let media: MediaService;
 let flushResolve: (() => void) | null = null;
 let closing = false;
 
@@ -31,8 +34,13 @@ function isAppUrl(url: string): boolean {
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: 1440,
+    height: 900,
+    minWidth: 1100,
+    minHeight: 700,
+    backgroundColor: "#0e0f11",
+    titleBarStyle: "hiddenInset",
+    trafficLightPosition: {x: 18, y: 15},
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -40,6 +48,7 @@ function createWindow(): void {
       // Playback timing must not stall when the window is behind others.
       backgroundThrottling: false,
       preload: path.join(__dirname, "preload.js"),
+      additionalArguments: E2E_ARGS,
     },
   });
   mainWindow.webContents.setWindowOpenHandler(() => ({action: "deny"}));
@@ -67,6 +76,8 @@ function createWindow(): void {
   mainWindow.on("closed", () => {
     stop();
     mainWindow = null;
+    // The hidden worker is a window too: leaving it open would stop "window-all-closed" and the dock re-open check.
+    media?.shutdown();
   });
 }
 
@@ -89,7 +100,7 @@ async function toCard(s: Awaited<ReturnType<ProjectStore["list"]>>[number]): Pro
 
 handle(IPC.projects.list, null, async () => Promise.all((await store.list()).map(toCard)));
 handle(IPC.projects.create, Req.create, (req) => store.create(req));
-handle(IPC.projects.open, Req.id, ({id}) => store.open(id));
+handle(IPC.projects.open, Req.id, async ({id}) => ({...(await store.open(id)), baseUrl: mediaUrl(store.dir(id))}));
 handle(IPC.projects.save, Req.save, ({project}) => store.save(project));
 handle(IPC.projects.rename, Req.rename, ({id, name}) => store.rename(id, name));
 handle(IPC.projects.duplicate, Req.duplicate, ({id, fps}) => store.duplicate(id, {fps}));
@@ -105,8 +116,99 @@ handle(IPC.projects.remove, Req.id, async ({id}) => {
     detail: "The project folder, including its copied media, goes to the Trash.",
   });
   if (answer.response !== 0) return false;
+  await media.cancelAndWait(id); // no late write may recreate the folder
   await store.delete(id);
   return true;
+});
+
+
+// ---- media import and processing (M2)
+// Development and end-to-end runs only: STUDIO_E2E_PICK_FILE names a JSON file holding the paths a dialog would return,
+// so the real import and relink code runs without driving a native dialog. Ignored in packaged builds.
+const E2E = E2E_ARGS.length > 0;
+async function pickFiles(options: Electron.OpenDialogOptions): Promise<string[]> {
+  const stub = process.env.STUDIO_E2E_PICK_FILE;
+  if (E2E && stub) return JSON.parse(await fs.promises.readFile(stub, "utf8")) as string[];
+  const result = await dialog.showOpenDialog(mainWindow!, options);
+  return result.canceled ? [] : result.filePaths;
+}
+
+const MEDIA_FILTER = [{name: "Media", extensions: ["mp4", "mov", "m4v", "mp3", "m4a", "wav", "jpg", "jpeg", "png"]}];
+
+async function projectDir(projectId: string): Promise<string> {
+  const dir = store.dir(projectId); // throws for anything that is not a UUID
+  await fs.promises.access(path.join(dir, "project.json"));
+  return dir;
+}
+
+async function importPaths(projectId: string, paths: string[]): Promise<ImportOutcome> {
+  const dir = await projectDir(projectId);
+  const out: ImportOutcome = {imported: [], errors: []};
+  const seen = new Set<string>();
+  for (const file of paths) {
+    try {
+      const r: ImportedFile = await importAssetFile(dir, file, {denyUnder: store.root});
+      if (!seen.has(r.sha256)) out.imported.push(r);
+      seen.add(r.sha256);
+    } catch (err) {
+      // Only expected failures reach the user with their message; anything else is logged and summarised.
+      if (!(err instanceof ImportError)) console.error("[import]", err);
+      out.errors.push({name: path.basename(file), message: err instanceof ImportError ? err.message : "Could not copy this file."});
+    }
+  }
+  return out;
+}
+
+const queueFor = (projectId: string, r: {sha256: string; ext: string; type: "video" | "audio" | "image"}, metaMissing: boolean) =>
+  media.enqueue({projectId, sha256: r.sha256, ext: r.ext, type: r.type, metaMissing});
+
+handle(IPC.media.import, MediaReq.import, async ({projectId}) => {
+  await projectDir(projectId);
+  const picked = await pickFiles({properties: ["openFile", "multiSelections"], filters: MEDIA_FILTER});
+  if (picked.length === 0) return {imported: [], errors: []} satisfies ImportOutcome;
+  const out = await importPaths(projectId, picked);
+  for (const r of out.imported) queueFor(projectId, r, true);
+  return out;
+});
+handle(IPC.media.importPaths, MediaReq.importPaths, async ({projectId, paths}) => {
+  const out = await importPaths(projectId, paths);
+  for (const r of out.imported) queueFor(projectId, r, true);
+  return out;
+});
+handle(IPC.media.relink, MediaReq.relink, async ({projectId, type}) => {
+  const dir = await projectDir(projectId);
+  const file = (await pickFiles({properties: ["openFile"], filters: MEDIA_FILTER, message: "Choose the replacement file"}))[0];
+  if (!file) return null;
+  const r = await importAssetFile(dir, file, {denyUnder: store.root});
+  // Clips keep their source offsets, so a replacement must at least be the same kind of media.
+  if (r.type !== type) throw new ImportError(`That file is ${r.type}, but the missing one is ${type}.`);
+  queueFor(projectId, r, true);
+  return r;
+});
+handle(IPC.media.ensure, MediaReq.ensure, async ({projectId, items}) => {
+  const dir = await projectDir(projectId);
+  await sweepStaleImports(dir); // copies abandoned by a crash or a window closed mid-import
+  const missing = new Set(await findMissing(dir, items));
+  const proxies: string[] = [];
+  for (const i of items) {
+    if (missing.has(i.sha256)) continue;
+    if (i.type === "video" && (await fileExists(cacheFile(dir, i.sha256, "proxy.mp4")))) proxies.push(i.sha256);
+    queueFor(projectId, i, i.metaMissing);
+  }
+  return {missing: [...missing], proxies};
+});
+handle(IPC.media.cancel, MediaReq.cancel, ({projectId, sha256}) => media.cancel(projectId, sha256));
+handle(IPC.media.readPeaks, MediaReq.peaks, async ({projectId, sha256}) => {
+  const file = cacheFile(await projectDir(projectId), sha256, "peaks");
+  const data = await fs.promises.readFile(file).catch(() => null);
+  return data && data.byteLength > 0 ? new Uint8Array(data) : null;
+});
+handle(IPC.media.deleteAssets, MediaReq.remove, async ({projectId, items}) => {
+  const dir = await projectDir(projectId);
+  for (const i of items) {
+    await media.cancelAndWait(projectId, i.sha256); // a running job must stop writing before its files go
+    await removeAssetFiles(dir, i.sha256, i.ext);
+  }
 });
 
 ipcMain.handle(IPC.openMedia, async (event): Promise<MediaHandle | null> => {
@@ -128,10 +230,23 @@ void app.whenReady().then(async () => {
   const root = process.env.STUDIO_PROJECTS_DIR ?? path.join(app.getPath("userData"), "projects");
   store = new ProjectStore(root, {remove: (dir) => shell.trashItem(dir)});
   await store.init();
-  allowMediaRoot(root); // thumbnails are served from project folders
+  allowMediaRoot(root); // thumbnails, proxies and imported assets are served from project folders
+  media = new MediaService({
+    projectDir: (id) => store.dir(id),
+    emit: (e) => mainWindow?.webContents.send(IPC.media.event, e),
+    // The first imported clip or image becomes the project's dashboard thumbnail, unless one is set already.
+    onThumb: (projectId, file) => {
+      void (async () => {
+        if (await fileExists(store.thumbnailPath(projectId))) return;
+        await store.setThumbnail(projectId, new Uint8Array(await fs.promises.readFile(file)));
+      })().catch(() => undefined);
+    },
+  });
   handleMediaProtocol();
   createWindow();
 });
+
+app.on("before-quit", () => media?.shutdown());
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

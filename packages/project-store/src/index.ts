@@ -12,6 +12,7 @@ import path from "node:path";
 import {writeFileAtomic} from "./atomic";
 
 export {writeFileAtomic};
+export * from "./assets";
 
 export type ProjectSummary = {id: string; name: string; updatedAt: string; width: number; height: number; fps: number; backgroundColor: string; hasThumbnail: boolean};
 export type OpenResult = {project: Project; recovered: boolean};

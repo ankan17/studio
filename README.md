@@ -44,6 +44,12 @@ pnpm test                # schema tests, store tests, and a SIGKILL-mid-save cra
 - Fonts: Noto Sans Bengali and Bebas Neue (SIL OFL) are in the spike repo `spike/fonts/`.
 - Memory bars apply to the 8GB Mac: editor tab under 600MB, total under 1.2GB, export peak under 1.5GB.
 
+## Verifying a milestone
+`python3 scripts/verify/verify.py M3` runs typecheck, lint, tests and an end-to-end run in the real app (Playwright over CDP, ffmpeg-generated fixtures, memory sampled from the in-app HUD), then writes `docs/reports/M3.md` with every check, its evidence and screenshots. Add `scripts/verify/e2e_<milestone>.py` and `docs/reports/<milestone>.notes.md` (hand-written limits and findings) for each new milestone. Needs `ffmpeg` and python `playwright`. Dialogs are stubbed in development runs with `STUDIO_E2E=1` and `STUDIO_E2E_PICK_FILE` (ignored in packaged builds).
+
+## M2 status (media import) and M3 status (preview engine)
+Both done and verified, see `docs/reports/M2.md` and `docs/reports/M3.md`. M2: import by dialog or drop with sha256 de-duplication into `assets/<sha>.<ext>`, a one-job-at-a-time queue in main driving a hidden worker window (`media-service.ts`, `media-worker.ts`: metadata, 720p CFR proxies sized to the real picture, thumbnails, filmstrips, peaks), media panel with search, filters, relink and cleanup. M3: `engine/ProjectComposition.tsx` (one composition for preview and export, memoised clip layers, 2s premount window), Player wired to `playback.ts`, transport and keyboard (Space, arrows, Home, End), append-to-timeline from the media panel, read-only sequence strip, bundled fonts. `remotion_mediaCacheSizeInBytes` must be at least 240MB or `@remotion/media` silently falls back to a native `<video>`. UI tokens and components live in `src/index.css` and `src/icons.tsx`; keep base element rules inside `@layer base` or they override Tailwind utilities.
+
 ## M1 status
 Done: monorepo, Forge + Vite + sandboxed renderer, Zod-validated typed IPC, hardened `media://`, schema v1 with validators and migration scaffold, project folder manager, atomic save, recovery snapshots, debounced autosave, dashboard, memory HUD.
 M1 exit check: the crash test SIGKILLs a writer at random moments 12 times and the project always reopens; an end-to-end run in the real app covered create, edit, autosave, reopen, duplicate and rejected bad input.

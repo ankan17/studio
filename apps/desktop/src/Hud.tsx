@@ -1,7 +1,7 @@
 import {useEffect, useState} from "react";
 import type {MemoryMetrics} from "./ipc";
 
-// Memory HUD: total and per-process working set, plus peak. Bars (8GB Mac): editor tab 600MB, total 1.2GB, export 1.5GB.
+// Memory readout in the status bar. Bars (8GB Mac): editor tab 600MB, total 1.2GB, export 1.5GB. Turns amber near the bar.
 export function Hud() {
   const [m, setM] = useState<MemoryMetrics | null>(null);
   const [peak, setPeak] = useState(0);
@@ -14,10 +14,13 @@ export function Hud() {
     [],
   );
   const procs = m ? Object.entries(m.byProcess).sort((a, b) => b[1] - a[1]) : [];
+  const hot = (m?.totalMB ?? 0) > 1000;
   return (
-    <div className="font-mono text-xs bg-black text-green-300 p-2">
-      total {m?.totalMB ?? "-"}MB (peak {peak}MB) | swap used {m?.swapMB ?? "-"}MB
-      <div>{procs.map(([k, v]) => `${k} ${v}MB`).join("  ")}</div>
+    <div className="mono flex items-center gap-3 text-[10.5px] text-faint" data-testid="hud">
+      <span className={hot ? "text-warn" : "text-dim"}>Memory {m?.totalMB ?? "–"} MB</span>
+      <span>peak {peak}</span>
+      <span>swap {m ? Math.round(m.swapMB) : "–"}</span>
+      <span className="hidden truncate lg:inline">{procs.map(([k, v]) => `${k} ${v}`).join("  ")}</span>
     </div>
   );
 }
