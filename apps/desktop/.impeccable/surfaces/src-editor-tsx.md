@@ -9,7 +9,7 @@ related_targets: ["src/Dashboard.tsx"]
 
 Scope: the whole app shell (dashboard, new-project dialog, editor). Visitor mode: Operate.
 Audience and job: a non-technical editor who knows CapCut or iMovie, cutting iPhone clips into short videos on an 8GB Mac. Task: import, arrange, adjust a clip, preview; never lose work.
-Constraints: memory budget (no blur, no always-running animation), no controls for features that do not exist yet (split, titles, zoom, export arrive in later milestones), Bengali and English names.
+Constraints: memory budget (no blur, no always-running animation), no controls for features that do not exist yet (titles, transitions, speed, export arrive in later milestones; split, zoom, snapping and tracks arrived in M4), Bengali and English names.
 Chosen structure: three columns (media, viewer, inspector for the selected clip) over a route timeline.
 Memorable moment: the timeline reads like a metro line, and cuts that line up across tracks show an interchange ring.
 

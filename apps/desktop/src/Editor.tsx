@@ -1,4 +1,5 @@
 import {useEffect, useState} from "react";
+import {edits, view} from "./edits";
 import {useEditor, type SaveState} from "./editorStore";
 import {Back, Check, Warning} from "./icons";
 import {Hud} from "./Hud";
@@ -6,8 +7,9 @@ import {Inspector} from "./Inspector";
 import {MediaPanel} from "./MediaPanel";
 import {ensureMedia, handleMediaEvent, useMedia} from "./mediaStore";
 import {playback} from "./playback";
-import {SequenceStrip} from "./SequenceStrip";
 import {Stage} from "./Stage";
+import {Timeline} from "./Timeline";
+import {clearTimelineMedia} from "./timelineMedia";
 import {Transport} from "./Transport";
 
 // Saved is a quiet ink tick, not a colour: gold would sit too close to the orange "unsaved" dot.
@@ -18,10 +20,13 @@ const SAVE: Record<SaveState, {label: string; dot: string | null}> = {
   error: {label: "Could not save", dot: "bg-danger"},
 };
 
-const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
+// A slider keeps its arrow keys; every other shortcut still works while it has focus.
+const isTyping = (t: EventTarget | null, key: string) =>
+  t instanceof HTMLElement &&
+  (t.isContentEditable || ["TEXTAREA", "SELECT"].includes(t.tagName) || (t instanceof HTMLInputElement && (t.type !== "range" || key.startsWith("Arrow") || key === "Home" || key === "End")));
 
 export function Editor() {
-  const {project, recovered, saveState, error, update, close} = useEditor();
+  const {project, recovered, saveState, error, dispatch, close, refusal} = useEditor();
   const projectId = project?.id;
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -30,6 +35,8 @@ export function Editor() {
     if (!projectId) return;
     useMedia.getState().reset();
     playback.reset();
+    view.reset();
+    clearTimelineMedia();
     const off = window.studio.media.onEvent(handleMediaEvent);
     void ensureMedia(projectId, useEditor.getState().project?.assets ?? []);
     return () => {
@@ -38,18 +45,50 @@ export function Editor() {
     };
   }, [projectId]);
 
-  // Keyboard: the same functions the buttons call.
+  // A refused edit is explained in the status bar for a few seconds.
+  useEffect(() => {
+    if (!refusal) return;
+    const t = setTimeout(() => useEditor.setState({refusal: null}), 4000);
+    return () => clearTimeout(t);
+  }, [refusal]);
+
+  // Keyboard: the same functions the buttons and menus call.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      // In the project name field, Cmd+Z undoes the rename through the history (the field's own undo fights React).
+      const nameField = e.target instanceof HTMLInputElement && e.target.getAttribute("aria-label") === "Project name";
+      if (nameField && (e.metaKey || e.ctrlKey) && e.code === "KeyZ") {
+        e.preventDefault();
+        return void (e.shiftKey ? useEditor.getState().redo() : useEditor.getState().undo());
+      }
+      if (isTyping(e.target, e.key) || e.altKey) return;
       const fps = useEditor.getState().project?.fps ?? 30;
-      const hit = (fn: () => void) => (e.preventDefault(), fn());
+      const hit = (fn: () => unknown) => (e.preventDefault(), void fn());
+      const mod = e.metaKey || e.ctrlKey;
+      const ed = useEditor.getState();
+      if (mod) {
+        if ((e.code === "KeyZ" || e.code === "KeyY") && document.body.dataset.dragging) return hit(() => {}); // not mid-drag
+        if (e.code === "KeyZ") hit(e.shiftKey ? ed.redo : ed.undo);
+        else if (e.code === "KeyY") hit(ed.redo);
+        else if (e.code === "KeyD") hit(edits.duplicate);
+        else if (e.code === "KeyA") hit(edits.selectAll);
+        else if (e.code === "KeyB") hit(edits.split);
+        else if (e.code === "Equal") hit(() => view.zoomBy(1.5));
+        else if (e.code === "Minus") hit(() => view.zoomBy(1 / 1.5));
+        return;
+      }
       if (e.code === "Space") hit(playback.toggle);
       else if (e.code === "ArrowLeft") hit(() => playback.step(e.shiftKey ? -fps : -1));
       else if (e.code === "ArrowRight") hit(() => playback.step(e.shiftKey ? fps : 1));
       else if (e.code === "Home") hit(playback.toStart);
       else if (e.code === "End") hit(playback.toEnd);
-      else if (e.code === "Escape") hit(() => useEditor.getState().selectClip(null));
+      else if (e.code === "Escape") hit(() => ed.select([]));
+      else if (e.code === "KeyS") hit(edits.split);
+      else if (e.code === "Delete" || e.code === "Backspace") hit(edits.delete);
+      else if (e.code === "KeyN") hit(view.toggleSnapping);
+      else if (e.code === "KeyZ" && e.shiftKey) hit(view.fit);
+      else if (e.code === "Equal") hit(() => view.zoomBy(1.5));
+      else if (e.code === "Minus") hit(() => view.zoomBy(1 / 1.5));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -66,8 +105,8 @@ export function Editor() {
           className="no-drag h-7 min-w-[80px] max-w-[320px] rounded-[6px] [field-sizing:content] border border-transparent bg-transparent px-2 text-[13px] font-semibold outline-none transition-colors duration-150 hover:border-line focus:border-go focus:bg-ground"
           value={project.name}
           aria-label="Project name"
-          onChange={(e) => update((p) => void (p.name = e.target.value))}
-          onBlur={(e) => !e.target.value.trim() && update((p) => void (p.name = "Untitled"))}
+          onChange={(e) => dispatch({type: "setProject", patch: {name: e.target.value}}, {coalesce: "name", label: "Rename"})}
+          onBlur={(e) => !e.target.value.trim() && dispatch({type: "setProject", patch: {name: "Untitled"}}, {coalesce: "name", label: "Rename"})}
         />
         <span className="no-drag flex items-center gap-1.5 text-caption text-ink-2" title={error ?? undefined} data-testid="save-state">
           {save.dot ? <span className={`h-1.5 w-1.5 rounded-full ${save.dot}`} /> : <span className="-mx-0.5 text-ink-3"><Check size={12} /></span>}
@@ -76,7 +115,7 @@ export function Editor() {
         <div className="flex-1" />
         <label className="no-drag flex items-center gap-2 text-caption text-ink-2" title="Colour behind clips that do not fill the frame">
           Background
-          <input type="color" className="h-5 w-5 cursor-pointer appearance-none rounded-full border border-line bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-0" value={project.backgroundColor} onChange={(e) => update((p) => void (p.backgroundColor = e.target.value))} />
+          <input type="color" className="h-5 w-5 cursor-pointer appearance-none rounded-full border border-line bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-0" value={project.backgroundColor} onChange={(e) => dispatch({type: "setProject", patch: {backgroundColor: e.target.value}}, {coalesce: "background", label: "Background colour"})} />
         </label>
       </header>
       {recovered && (
@@ -93,11 +132,15 @@ export function Editor() {
         </section>
         <Inspector />
       </main>
-      <div className="p-2.5"><SequenceStrip /></div>
+      <div className="p-2.5"><Timeline /></div>
       <footer className="flex h-6 shrink-0 items-center gap-4 border-t border-line-soft px-4 text-[11px] text-ink-3">
         <Hud />
         <span className="flex-1" />
-        <span className="hidden lg:inline">Space play · ← → one frame · ⇧ one second · Esc deselect</span>
+        {refusal ? (
+          <span className="flex items-center gap-1.5 text-warn" role="status" data-testid="refusal"><Warning size={12} /> {refusal}</span>
+        ) : (
+          <span className="hidden lg:inline">Space play · S split · ⌫ delete · ⌘Z undo · ⌘= zoom · right-click for more</span>
+        )}
       </footer>
     </div>
   );

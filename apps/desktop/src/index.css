@@ -282,6 +282,39 @@ body {
     color: var(--color-ink);
   }
 
+  /* context menu: the one lifted surface besides the dialog */
+  .menu {
+    background: var(--color-raised);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    box-shadow: 0 12px 32px -8px rgb(5 7 11 / 0.7);
+  }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: calc(100% - 8px);
+    height: 28px;
+    margin: 0 4px;
+    padding: 0 10px;
+    border-radius: 5px;
+    font-size: var(--text-label);
+    font-weight: 500;
+    outline: none;
+  }
+  .menu-item:hover:not(:disabled),
+  .menu-item:focus-visible {
+    background: var(--color-hover);
+  }
+  .menu-item-danger:hover:not(:disabled),
+  .menu-item-danger:focus-visible {
+    color: var(--color-danger);
+  }
+  .menu-item:disabled {
+    color: var(--color-ink-3);
+    opacity: 0.6;
+  }
+
   /* line roundel: a media type's colour, the same mark in the media panel, the inspector and the timeline */
   .roundel {
     display: inline-grid;

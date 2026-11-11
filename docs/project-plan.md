@@ -226,15 +226,17 @@ Exit, Gate 1: create a project, import two videos, preview, save, reopen, previe
 
 ### M4 Timeline
 
-- [ ] `editor-core` commands with inverse patches and unit tests: add, move, trim, split, delete, duplicate, reorder tracks
-- [ ] Ruler, playhead, zoom, horizontal scroll, virtualised rows and clips
-- [ ] Pointer-capture drag, trim handles, snapping to clip edges, playhead and markers
-- [ ] Multi-select, context menu, keyboard shortcuts
-- [ ] Track add, delete, lock, visibility, mute
-- [ ] Filmstrips and waveforms drawn on clips
-- [ ] Inspector per clip type, canvas selection and drag to position
+- [x] `editor-core` commands with inverse patches and unit tests: add, move, trim, split, delete, duplicate, reorder tracks
+- [x] Ruler, playhead, zoom, horizontal scroll, virtualised rows and clips
+- [x] Pointer-capture drag, trim handles, snapping to clip edges, playhead and markers
+- [x] Multi-select, context menu, keyboard shortcuts
+- [x] Track add, delete, lock, visibility, mute
+- [x] Filmstrips and waveforms drawn on clips
+- [x] Inspector per clip type, canvas selection and drag to position
 
 Exit: rough-cut a 10-clip vlog by hand. Fifty undo and redo steps leave the project identical. Timeline scrolls at 60fps with 100 clips.
+
+**Status: built and verified.** 55 of 55 checks pass (`docs/reports/M4.md`): a 10-clip rough cut made by hand in the real app, 50 undo and 50 redo steps return identical projects, and 100 clips scroll at about 120fps on the dev Mac (60fps bar). New package `editor-core` holds the commands, undo history and snapping. Finding: the timeline and undo history add no measurable memory; scrubbing across many clips fills the 240MB decoded-frame cache, bringing the editor tab near its 600MB bar on the dev Mac. Still to confirm on the 8GB Mac: the rough cut with real footage, 60fps scrolling and the editor memory bar.
 
 ### M5 Editing features
 

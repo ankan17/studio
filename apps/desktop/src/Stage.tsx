@@ -1,6 +1,7 @@
 import {Player, type PlayerRef} from "@remotion/player";
 import {projectDurationFrames} from "@studio/schema";
 import {useEffect, useMemo, useRef} from "react";
+import {CanvasSelect} from "./CanvasSelect";
 import {ProjectComposition, type EngineProps} from "./engine/ProjectComposition";
 import {useEditor} from "./editorStore";
 import {attachPlayer, setDuration, usePlayback} from "./playback";
@@ -41,6 +42,7 @@ export function Stage() {
           clickToPlay={false}
           style={{width: "100%", height: "100%"}}
         />
+        {total > 0 && <CanvasSelect />}
         {total === 0 && (
           <div className="absolute inset-0 grid place-items-center bg-frame p-6 text-center">
             <div className="grid max-w-[34ch] justify-items-center gap-1.5">

@@ -47,6 +47,9 @@ importers:
       '@remotion/web-renderer':
         specifier: 4.0.542
         version: 4.0.542(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@studio/editor-core':
+        specifier: workspace:*
+        version: link:../../packages/editor-core
       '@studio/project-store':
         specifier: workspace:*
         version: link:../../packages/project-store
@@ -123,6 +126,19 @@ importers:
       vite:
         specifier: 6.4.5
         version: 6.4.5(@types/node@20.12.14)(jiti@2.7.0)(lightningcss@1.31.1)(terser@5.51.2)(tsx@4.23.15)
+
+  packages/editor-core:
+    dependencies:
+      '@studio/schema':
+        specifier: workspace:*
+        version: link:../schema
+      immer:
+        specifier: ^10.1.0
+        version: 10.2.0
+    devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
 
   packages/project-store:
     dependencies:

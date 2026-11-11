@@ -22,12 +22,12 @@ export const canAppend = (asset: Asset): boolean => asset.type === "image" || (a
 
 /**
  * Append an asset at the end of the first track of the right kind (creating it if there is none) and return the new
- * clip's id. Video clips share a track with images. Mutates the draft it is given (use inside an immer recipe).
+ * clip's id. Video clips share a track with images; `usable` can rule tracks out (the editor skips locked ones). Mutates the draft it is given (use inside an immer recipe).
  */
-export function appendAssetClip(draft: Project, asset: Asset, ids: {clip: string; track: string}): string | null {
+export function appendAssetClip(draft: Project, asset: Asset, ids: {clip: string; track: string}, usable: (t: Track) => boolean = () => true): string | null {
   if (!canAppend(asset)) return null;
   const kind = asset.type === "audio" ? "audio" : "video";
-  let track = draft.tracks.find((t) => t.type === kind);
+  let track = draft.tracks.find((t) => t.type === kind && usable(t));
   if (!track) {
     const created: Track = {id: ids.track, type: kind, muted: false, locked: false, visible: true, clips: []};
     // video above audio: new video tracks go to the top, audio tracks to the bottom

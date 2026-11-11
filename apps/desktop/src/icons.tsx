@@ -32,3 +32,14 @@ export const Layers = ({size = 16}: P) => base(<><path d="M12 4l9 5-9 5-9-5z" />
 export const Duplicate = ({size = 16}: P) => base(<><rect x="8" y="8" width="12" height="12" rx="2.5" /><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8" /></>, size);
 export const Pencil = ({size = 16}: P) => base(<><path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z" /></>, size);
 export const Wave = ({size = 16}: P) => base(<path d="M4 12h1.5M8 8v8M12 5v14M16 9v6M20 12h-1.5" />, size);
+export const Undo = ({size = 16}: P) => base(<><path d="M9 14L4.5 9.5 9 5" /><path d="M5 9.5h9.5a5 5 0 0 1 0 10H11" /></>, size);
+export const Redo = ({size = 16}: P) => base(<><path d="M15 14l4.5-4.5L15 5" /><path d="M19 9.5H9.5a5 5 0 0 0 0 10H13" /></>, size);
+export const Scissors = ({size = 16}: P) => base(<><circle cx="6.5" cy="7" r="2.5" /><circle cx="6.5" cy="17" r="2.5" /><path d="M8.6 8.4L20 17M8.6 15.6L20 7" /></>, size);
+export const Magnet = ({size = 16}: P) => base(<><path d="M6 4v8a6 6 0 0 0 12 0V4" /><path d="M6 8h3.5M14.5 8H18" /><path d="M9.5 4v8a2.5 2.5 0 0 0 5 0V4" /></>, size);
+export const Lock = ({size = 16}: P) => base(<><rect x="5.5" y="10.5" width="13" height="9" rx="2" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></>, size);
+export const Unlock = ({size = 16}: P) => base(<><rect x="5.5" y="10.5" width="13" height="9" rx="2" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 6.6-1.6" /></>, size);
+export const Eye = ({size = 16}: P) => base(<><path d="M3 12s3.3-6 9-6 9 6 9 6-3.3 6-9 6-9-6-9-6Z" /><circle cx="12" cy="12" r="2.5" /></>, size);
+export const EyeOff = ({size = 16}: P) => base(<><path d="M9.9 6.3A9.6 9.6 0 0 1 12 6c5.7 0 9 6 9 6a15.6 15.6 0 0 1-2.2 3M6.2 7.8C4.2 9.4 3 12 3 12s3.3 6 9 6a9 9 0 0 0 4.3-1.1" /><path d="M4 4l16 16" /></>, size);
+export const Mute = ({size = 16}: P) => base(<><path d="M5 10v4h3l4 3.5v-11L8 10z" /><path d="M16 10l4 4M20 10l-4 4" /></>, size);
+export const Minus = ({size = 16}: P) => base(<path d="M5 12h14" />, size);
+export const FitWidth = ({size = 16}: P) => base(<><path d="M4 6v12M20 6v12" /><path d="M8 12h8" /><path d="M10.5 9.5L8 12l2.5 2.5M13.5 9.5L16 12l-2.5 2.5" /></>, size);

@@ -2,7 +2,7 @@
 // worker events into asset-manifest updates (the renderer owns project.json, so metadata lands via the editor store).
 import type {Asset} from "@studio/schema";
 import {create} from "zustand";
-import {useEditor} from "./editorStore";
+import {history, useEditor} from "./editorStore";
 import type {ImportOutcome, ImportResult, MediaEvent, Stage} from "./ipc";
 
 export type JobState = {status: "queued" | "running" | "error"; stage?: Stage; fraction: number; error?: string};
@@ -170,6 +170,9 @@ export async function removeAssets(projectId: string, assets: Asset[]): Promise<
   const ids = new Set(assets.map((a) => a.id));
   const editor = useEditor.getState();
   editor.update((p) => void (p.assets = p.assets.filter((a) => !ids.has(a.id))));
+  // Undo could otherwise bring back a clip whose file is about to be deleted.
+  history.clear();
+  useEditor.setState((s) => ({historyRev: s.historyRev + 1}));
   await editor.flush();
   if (useEditor.getState().saveState !== "saved") {
     patch(() => ({notice: "Could not save the project, so no files were deleted."}));

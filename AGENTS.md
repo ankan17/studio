@@ -24,10 +24,10 @@ All paths are from the repo root.
 
 ## Commands
 
-pnpm workspace driven by turbo: `apps/desktop` (`@studio/desktop`), `packages/schema` (`@studio/schema`), `packages/project-store` (`@studio/project-store`).
+pnpm workspace driven by turbo: `apps/desktop` (`@studio/desktop`), `packages/schema` (`@studio/schema`), `packages/editor-core` (`@studio/editor-core`), `packages/project-store` (`@studio/project-store`).
 
 - `pnpm dev`: starts the app (`electron-forge start`). When scripting, keep stdin open: `cd apps/desktop && npx electron-forge start < <(sleep 1700)`. Forge exits as soon as stdin closes.
-- One package: `pnpm --filter @studio/schema test`. One file: `pnpm --filter @studio/project-store test -- crash.test.ts`. Tests exist only in the two packages. The desktop app is checked through `scripts/verify`.
+- One package: `pnpm --filter @studio/schema test`. One file: `pnpm --filter @studio/project-store test -- crash.test.ts`. Tests exist only in the three packages. The desktop app is checked through `scripts/verify`.
 - `python3 scripts/verify/visual.py [--only a,b] [--update]`: visual regression against `scripts/verify/visual-baselines/`, with a report in `docs/reports/visual/index.html`. Baselines are machine-specific, so review them before committing an `--update`.
 - The verify scripts need `ffmpeg` and Python `playwright`. They drive the real app over CDP with `STUDIO_E2E=1` and `STUDIO_E2E_PICK_FILE` stubbing the native dialogs.
 
@@ -37,7 +37,7 @@ Source files below are in `apps/desktop/src/` unless a package is named.
 
 - **Main** (`main.ts`) owns the window, the security settings and every IPC handler. `ipc.ts` is the single typed contract: Zod schemas for every request, exposed to the renderer as `window.studio` by `preload.ts`. A new call is added in `ipc.ts`, `main.ts` and `preload.ts` together.
 - **Media** goes through main: `media-service.ts` queues one job at a time for a hidden worker window (`media-worker.ts`), which makes metadata, 720p proxies, thumbnails, filmstrips and peaks. The renderer reads files only through the hardened `media://` protocol (`media-protocol.ts`).
-- **Renderer** state is zustand + immer (`editorStore.ts`, `mediaStore.ts`) with an 800ms debounced autosave. `engine/ProjectComposition.tsx` is the single composition used for both the Player preview and export.
+- **Renderer** state is zustand + immer (`editorStore.ts`, `mediaStore.ts`) with an 800ms debounced autosave. Every timeline, clip, track and project edit is a command from `@studio/editor-core` sent through `dispatch()`, which records inverse patches for undo; add a command there (with a vitest) rather than mutating the project in the renderer. `update()` is only for the asset manifest and throws if a recipe touches anything else. `engine/ProjectComposition.tsx` is the single composition used for both the Player preview and export.
 - **Persistence** is `@studio/project-store` (Node only, used from main). `project.json` is the source of truth and `index.json` is a rebuildable mirror. Saves are atomic and serialised, with recovery snapshots. Don't write project files any other way.
 - **Schema** (`@studio/schema`) puts timeline positions in integer frames and source offsets in integer microseconds. Change it through `migrateProject` rather than editing v1 in place.
 
@@ -47,4 +47,6 @@ Source files below are in `apps/desktop/src/` unless a package is named.
 - Keep `backgroundThrottling: false` on the editor and worker windows. `remotion_mediaCacheSizeInBytes` must stay at least 240MB, or `@remotion/media` silently falls back to `<video>`.
 - Only non-shader transitions work (Electron ships Chrome 148). `<Video>` needs an explicit width and height, or portrait clips crop.
 - Memory budgets on the 8GB target: editor under 600MB, total under 1.2GB, export peak under 1.5GB. Numbers from a bigger dev machine don't count.
+- Images from `media://` drawn onto a canvas need `crossOrigin = "anonymous"`, or the canvas is tainted and tests cannot read it.
+- In `visual.py`, a shot taken mid-drag needs `park=False`: parking the pointer before the capture would drag further.
 - UI tokens live in `apps/desktop/src/index.css`. Keep base element rules inside `@layer base`, or they override Tailwind utilities.

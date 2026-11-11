@@ -246,7 +246,7 @@ A dark, hue-tinted graphite field with three media-line colours and one gold for
 
 ## Layout
 
-The editor is a fixed, full-window tool: a 44px title bar (hidden-inset, 84px left inset for the traffic lights), then three columns in a row separated by 10px gutters (media panel 340px, viewer flexible, inspector 300px), then the route timeline across the full width, then a 24px status bar. Panels pad 14px (media, timeline) or 16px (inspector); the dialog pads 20px. The timeline is drawn on a fixed geometry: 112px label column, 14px rail padding, 60px rows, 36px header, 26px ruler; ruler steps choose the smallest interval that leaves at least 84px between marks.
+The editor is a fixed, full-window tool: a 44px title bar (hidden-inset, 84px left inset for the traffic lights), then three columns in a row separated by 10px gutters (media panel 340px, viewer flexible, inspector 300px), then the route timeline across the full width, then a 24px status bar. Panels pad 14px (media, timeline) or 16px (inspector); the dialog pads 20px. The timeline is drawn on a fixed geometry: 168px track header column, 14px rail padding, 60px rows (four show, more scroll), 36px header with the tools, 26px ruler, 10px scrollbar row; ruler steps choose the smallest interval that leaves at least 84px between marks, counting frames once zoomed past one label a second.
 
 The dashboard is a centred column (max 1100px, 32px padding) with an auto-fill card grid (min 250px, 20px column and 28px row gaps). Inspector rows are a 72px label column and a control column with 12px gaps. Long prose is capped at 68ch.
 
@@ -255,7 +255,8 @@ The dashboard is a centred column (max 1100px, 32px padding) with an auto-fill c
 The system is flat and tonal. Depth is the order ground, surface, raised, hover, each about 4 OKLCH lightness steps apart, with hairline borders (line-soft for panels, line for controls). Inputs and segmented controls drop back to ground so they read as wells cut into the panel. Shadows are ambient and rare.
 
 ### Shadow Vocabulary
-- **Dialog lift** (`box-shadow: 0 24px 64px -12px rgb(5 7 11 / 0.7)`): the New project dialog over a 75% ground scrim. The only lifted surface.
+- **Dialog lift** (`box-shadow: 0 24px 64px -12px rgb(5 7 11 / 0.7)`): the New project dialog over a 75% ground scrim.
+- **Menu lift** (`box-shadow: 0 12px 32px -8px rgb(5 7 11 / 0.7)`): context menus. With the dialog, the only lifted surfaces.
 - **Thumb lift** (`box-shadow: 0 1px 3px rgb(5 7 11 / 0.5)`): the slider thumb, so the ink disc separates from its track.
 - **Surface ring** (`box-shadow: 0 0 0 2px var(--color-surface)`): a cut-out ring around station ticks, the interchange ring, the playhead dot and the on-timeline dot, so marks sit on the rail rather than merge into it.
 
@@ -298,6 +299,11 @@ An 18px circle filled with the media type's line colour, carrying its letter (V,
 
 ### Route Timeline (signature)
 Each track is a rail in its line colour; clips are blocks tinted 20% of that colour into surface, with a hairline edge, a 50% thumbnail strip, an 11px name and a 3px line-coloured bar along the bottom. Inner cuts are ink station ticks; a frame cut on two or more tracks is an interchange ring across them. The playhead is a 2px gold line with a 14px gold dot on the ruler and a gold Fira Mono timecode flag; the ruler marks step aside around it. Nothing on the timeline animates: the playhead jumps to each frame.
+
+Editing marks: a selected clip has the 2px gold outline and 3px ink trim handles inside its edges (on hover at 70% for unselected clips); a drag that snaps shows a 1px ink snap guide; a locked track's lane is shaded with 50% ground and its clips take no pointer edits; a hidden or muted track dims its clips. Track headers carry the roundel, the tag and 24px icon buttons for hide (video tracks), mute and lock, pressed in the gold wash. The header tools are icon buttons (undo, redo, split, delete, snapping), a ghost "+ Track" button and a neutral zoom slider between zoom out and in, with fit as a pressed icon button. On the preview, the selected clip is outlined in 2px gold inside its picture bounds (dashed when its track is locked).
+
+### Context menu
+A raised enamel list (line border, 8px radius, menu lift) of 28px rows in label type, 4px inset with 5px radius hover fills; shortcuts sit right in caption ink-3; separators are line-soft hairlines; a destructive row turns danger red on hover. Arrow keys move, Enter runs, Escape or a click outside closes. No entrance animation.
 
 ### Motion
 One authored entrance: the dialog grows from 97% in 180ms on ease-out `cubic-bezier(0.23, 1, 0.32, 1)` while its scrim fades in 150ms. Everything else is a 150ms colour transition or a 120ms press scale. Reduced motion disables the entrance, the scrim fade and button transitions. Nothing in the editor animates continuously: a tile without a thumbnail shows a static "No preview" placeholder.

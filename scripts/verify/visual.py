@@ -68,9 +68,10 @@ class Shots:
         self.page, self.results = page, []
         self.extra_masks = []  # footage that is not stable between runs (see the duplicate import below)
 
-    def settle(self):
+    def settle(self, park=True):
         p = self.page
-        p.mouse.move(W - 2, H - 2)  # park the pointer where it hovers nothing
+        if park:
+            p.mouse.move(W - 2, H - 2)  # park the pointer where it hovers nothing
         p.evaluate("""async () => { await document.fonts.ready;
             await Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; }))); }""")
         if p.locator("[data-testid=save-state]").count():
@@ -82,10 +83,11 @@ class Shots:
         kw = dict(type="png", scale="css", animations="disabled", caret="hide", mask=mask, mask_color="#ff00ff")
         return target.screenshot(**kw)
 
-    def shot(self, name, desc, element=None, hover=None):
+    def shot(self, name, desc, element=None, hover=None, park=True):
+        """park=False leaves the pointer where it is: for shots taken mid-drag, where moving it would drag further."""
         if ONLY and name not in ONLY:
             return
-        self.settle()
+        self.settle(park)
         target = self.page.locator(element) if element else self.page
         forced = self.force_hover(hover) if hover else None
         try:
@@ -271,13 +273,13 @@ def main():
         page.wait_for_selector("[data-testid=inspector] >> text=Picture")
         page.mouse.move(W - 2, H - 2)
         wait_until(painted, 20)
-        s.shot("editor-clip-selected", "A clip selected on the timeline: green outline on the clip, its picture and sound in the inspector.")
+        s.shot("editor-clip-selected", "A clip selected on the timeline: gold outline and trim handles on the clip, its timing, picture and sound in the inspector.")
         s.shot("inspector", "Inspector close-up for a video clip: fit, scale, position, opacity, volume in dB, fades in seconds.", element="[data-testid=inspector]")
         page.keyboard.press("Escape")
         page.click("button[aria-label=Loop]")
         s.shot("transport-loop-on", "Transport with Loop on.", element="[data-testid=stage] >> xpath=..")
         page.click("button[aria-label=Loop]")
-        s.shot("sequence-strip", "Sequence strip close-up: ruler, track labels, clip blocks with thumbnails, playhead.", element="[data-testid=sequence]")
+        s.shot("sequence-strip", "Timeline close-up: tools, ruler, track headers with hide, mute and lock, clips with filmstrips and a waveform, playhead.", element="[data-testid=sequence]")
         # Line a cut up across tracks: a second tone on A1, the first trimmed to end where V1 cuts
         add("tone.m4a")
         q = proj(); a1 = next(t for t in q["tracks"] if t["type"] == "audio")["clips"]
@@ -285,6 +287,57 @@ def main():
         page.mouse.move(W - 2, H - 2)
         page.wait_for_selector("[title='Cuts line up across tracks']")
         s.shot("sequence-interchange", "A V1 cut and an A1 cut on the same frame: the interchange ring spans both tracks.", element="[data-testid=sequence]")
+
+        # ---- M4 editing: menus, multi-select, zoom, snapping, tracks, canvas selection
+        seq = page.locator("[data-testid=sequence]")
+        blocks = page.locator("[data-testid=clip-block]")
+        blocks.nth(0).click(button="right", position={"x": 20, "y": 30})
+        page.wait_for_selector("[data-testid=context-menu]")
+        s.shot("timeline-clip-menu", "Right-click on a clip: Split at playhead (disabled, playhead elsewhere), Duplicate, Delete, Select all.")
+        page.keyboard.press("Escape")
+        blocks.nth(1).click(position={"x": 20, "y": 30}, modifiers=["Meta"])
+        page.mouse.move(W - 2, H - 2)
+        s.shot("timeline-multi-select", "Two clips selected with Cmd-click: both outlined, the inspector shows the count with Duplicate and Delete.")
+        page.keyboard.press("Escape")
+        page.locator("[data-track-head]").first.click(button="right")
+        page.wait_for_selector("[data-testid=context-menu]")
+        s.shot("timeline-track-menu", "Right-click on a track header: hide, mute, lock, move, add track, delete track.")
+        page.keyboard.press("Escape")
+        page.click("button[aria-label='Lock track A1']")
+        page.click("button[aria-label='Hide track V1']")
+        page.mouse.move(W - 2, H - 2)
+        s.shot("timeline-track-states", "V1 hidden (eye off, clips dimmed) and A1 locked (lock on, lane shaded).", element="[data-testid=sequence]")
+        page.click("button[aria-label='Show track V1']")
+        page.click("button[aria-label='Unlock track A1']")
+        focus_body()
+        page.keyboard.press("Home")
+        for _ in range(4):
+            page.keyboard.press("Meta+Equal")
+        page.mouse.move(W - 2, H - 2)
+        s.shot("timeline-zoomed", "Zoomed in four steps: the ruler counts frames, filmstrip tiles follow the source, the scrollbar appears.", element="[data-testid=sequence]")
+        page.keyboard.press("Shift+KeyZ")
+        page.wait_for_function("() => window.__e2e.view().ppf === null")
+        page.wait_for_timeout(300)
+        # mid-drag: the second V1 clip pulled left of the first one's end shows the snap guide on the cut
+        b = blocks.nth(1).bounding_box()
+        page.mouse.move(b["x"] + 40, b["y"] + 20)
+        page.mouse.down()
+        for i in range(1, 9):
+            page.mouse.move(b["x"] + 40 + 60 * i / 8, b["y"] + 20)
+        page.mouse.move(b["x"] + 40 + 4, b["y"] + 20)
+        page.wait_for_selector("[data-testid=snap-guide]")
+        s.shot("timeline-snap-guide", "Dragging a clip near a cut: it snaps flush and the snap guide marks the edge.", element="[data-testid=sequence]", park=False)
+        page.mouse.up()
+        focus_body()
+        page.keyboard.press("Home")
+        page.keyboard.press("Escape")
+        wait_until(painted, 20)
+        pv = page.locator("[data-testid=preview]").bounding_box()
+        page.mouse.click(pv["x"] + pv["width"] / 2, pv["y"] + pv["height"] / 2)
+        page.mouse.move(W - 2, H - 2)
+        wait_until(painted, 20)
+        s.shot("canvas-selected", "Clicking the picture selects the clip under the playhead: gold box on the preview, the clip outlined on the timeline, its inspector open.")
+        page.keyboard.press("Escape")
 
         # ---- dashboard with a project, hover
         page.click("button:has-text('Projects')")
@@ -314,6 +367,8 @@ def main():
         # Drop the 30s snapshots so it always opens from project.json.prev. open() takes the newest valid copy, which is
         # the latest save when that save happened to take a snapshot, so the picture would depend on timing.
         shutil.rmtree(work / "projects" / pid / "recovery", ignore_errors=True)
+        # and make .prev the final state: the track toggles above save several times, so the save before last varies
+        shutil.copyfile(work / "projects" / pid / "project.json", work / "projects" / pid / "project.json.prev")
         (work / "projects" / pid / "project.json").write_text('{"schemaVersion":1,"id":')
         page.click("[aria-label='Open Visual test']")
         page.wait_for_selector("text=restored from a recovery copy", timeout=20000)

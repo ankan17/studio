@@ -1,7 +1,10 @@
 import {useEffect} from "react";
 import {Dashboard} from "./Dashboard";
 import {Editor} from "./Editor";
-import {useEditor} from "./editorStore";
+import {locate, type Command} from "@studio/editor-core";
+import {useView} from "./edits";
+import {history, useEditor} from "./editorStore";
+import {timelineMediaStats} from "./timelineMedia";
 import {applyImport} from "./mediaStore";
 
 export function App() {
@@ -19,11 +22,23 @@ export function App() {
         return outcome;
       },
       project: () => useEditor.getState().project,
-      clearTimeline: () => useEditor.getState().update((p) => void (p.tracks = [])),
-      patchClip: (id: string, patch: {startFrame?: number; durationInFrames?: number}) =>
-        useEditor.getState().update((p) => {
-          for (const t of p.tracks) for (const c of t.clips) if (c.id === id) Object.assign(c, patch);
-        }),
+      // Test setup goes through the same commands as the UI.
+      clearTimeline: () => {
+        const ed = useEditor.getState();
+        for (const t of ed.project!.tracks) ed.dispatch({type: "deleteTrack", trackId: t.id});
+      },
+      patchClip: (id: string, patch: {startFrame?: number; durationInFrames?: number}) => {
+        const ed = useEditor.getState();
+        const clip = locate(ed.project!, id)!.clip;
+        if (patch.durationInFrames !== undefined) ed.dispatch({type: "trimClip", clipId: id, edge: "end", deltaFrames: patch.durationInFrames - clip.durationInFrames});
+        if (patch.startFrame !== undefined) ed.dispatch({type: "moveClips", clipIds: [id], deltaFrames: patch.startFrame - clip.startFrame});
+      },
+      dispatch: (cmd: Command) => useEditor.getState().dispatch(cmd),
+      selection: () => useEditor.getState().selection,
+      history: () => ({size: history.size, canUndo: history.canUndo, canRedo: history.canRedo}),
+      view: () => useView.getState(),
+      setView: (v: Partial<ReturnType<typeof useView.getState>>) => useView.setState(v),
+      mediaCache: timelineMediaStats,
     };
   }, []);
   return hasProject ? <Editor /> : <Dashboard />;

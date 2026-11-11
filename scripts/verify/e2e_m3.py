@@ -121,10 +121,9 @@ try:
 
     # ---- scrubbing and the second clip
     box = page.locator("[data-testid=sequence]").bounding_box()
-    track_x0 = box["x"] + 112 + 14  # LABEL_W + PAD in SequenceStrip.tsx
     def click_frame(f):
-        px = (page.evaluate("() => document.querySelector('[data-testid=sequence]').clientWidth") - 112 - 28) / max(total * 1.06, FPS * 12)
-        page.mouse.click(track_x0 + f * px, box["y"] + 50)  # the ruler: seeks without selecting a clip
+        g = page.evaluate("() => { const s = document.querySelector('[data-testid=sequence]').dataset; return {ppf: +s.ppf, sx: +s.scrollX, lane: +s.laneLeft, pad: +s.pad}; }")
+        page.mouse.click(box["x"] + g["lane"] + g["pad"] + f * g["ppf"] - g["sx"], box["y"] + 50)  # the ruler: seeks without selecting a clip
     click_frame(dur[0] + 20)
     ok = wait_until(lambda: current() == tc(dur[0] + 20) or abs(int(current().split(":")[1]) * 30 + int(current().split(":")[2]) - (dur[0] + 20)) <= 3, 3)
     C.check("Clicking the sequence moves the playhead", bool(ok), f"{current()} for frame {dur[0] + 20}")
