@@ -208,8 +208,8 @@ try:
     page.wait_for_timeout(3000)
     sample_until(lambda: page.locator("[data-testid=asset-tile] img").count() >= 10, 15)
     C.check("Reopen: all 12 assets present, no work re-queued, thumbnails load",
-            tiles.count() == 12 and page.get_by_text("Queued").count() == 0 and page.locator("[data-testid=asset-tile] img").count() >= 10,
-            f"tiles={tiles.count()} queued={page.get_by_text('Queued').count()}")
+            tiles.count() == 12 and page.get_by_text("Waiting…").count() == 0 and page.locator("[data-testid=asset-tile] img").count() >= 10,
+            f"tiles={tiles.count()} queued={page.get_by_text('Waiting…').count()}")
 
     # ---- cancel, then resume
     long_clip = work / "fixtures" / "long.mp4"
@@ -217,7 +217,7 @@ try:
     app.pick([long_clip])
     page.click("button:has-text('Import media')")
     tile = page.locator("[data-testid=asset-tile]", has_text="long.mp4")
-    started = wait_until(lambda: tile.count() and "Proxy" in tile.inner_text(), 60)
+    started = wait_until(lambda: tile.count() and "Preview" in tile.inner_text(), 60)  # stage label while the proxy encodes
     C.check("Proxy progress is shown while encoding", bool(started), tile.inner_text().replace("\n", " | ") if tile.count() else "no tile")
     # An import that lands while a job is running must not be disturbed by the job's cleanup (review finding).
     extra = work / "fixtures" / "extra.mp4"
@@ -232,7 +232,7 @@ try:
     gone = wait_until(lambda: tile.get_by_text("Cancel").count() == 0, 20)
     page.wait_for_timeout(1500)
     C.check("Cancel stops the proxy and leaves no partial file", bool(gone) and not (cache / f"{sha_long}.proxy.mp4").exists() and not list(cache.glob("*.part")), sorted(p.name for p in cache.glob(f"{sha_long}*")))
-    tile.get_by_text("Make proxy").click()
+    tile.get_by_text("Make preview").click()
     ok = wait_until(lambda: (cache / f"{sha_long}.proxy.mp4").exists() and any(a.get("proxyPath") and a["name"] == "long.mp4" for a in proj()["assets"]), 120)
     C.check("A cancelled proxy can be restarted and completes", bool(ok))
 

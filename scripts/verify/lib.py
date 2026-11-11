@@ -138,7 +138,8 @@ class MemorySampler:
         self.page, self.samples = page, []
 
     def sample(self):
-        txt = self.page.evaluate("() => document.querySelector('[data-testid=hud]')?.innerText || ''")
+        # the HUD shows total and peak; swap and per-process figures live in its tooltip
+        txt = self.page.evaluate("() => { const h = document.querySelector('[data-testid=hud]'); return h ? h.innerText + '\\n' + (h.title || '') : ''; }")
         m = re.search(r"Memory (\d+) MB", txt)
         if not m:
             return

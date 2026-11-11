@@ -5,7 +5,7 @@
 //   <root>/<id>/recovery/<ms>.json    periodic snapshots (newest 10 kept)
 //   <root>/<id>/assets, cache, thumbnail.jpg
 // Ids come from the renderer, so every id is checked to be a UUID before it touches a path.
-import {convertProjectFps, createProject, migrateProject, type Fps, type Project} from "@studio/schema";
+import {convertProjectFps, createProject, migrateProject, projectDurationFrames, type Fps, type Project} from "@studio/schema";
 import {randomUUID} from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -14,7 +14,20 @@ import {writeFileAtomic} from "./atomic";
 export {writeFileAtomic};
 export * from "./assets";
 
-export type ProjectSummary = {id: string; name: string; updatedAt: string; width: number; height: number; fps: number; backgroundColor: string; hasThumbnail: boolean};
+export type ProjectSummary = {
+  id: string;
+  name: string;
+  updatedAt: string;
+  width: number;
+  height: number;
+  fps: number;
+  backgroundColor: string;
+  hasThumbnail: boolean;
+  /** Timeline length; absent in index files written before it existed. */
+  durationFrames?: number;
+  /** Media types on the timeline, in video, audio, image order; absent in older index files. */
+  kinds?: ("video" | "audio" | "image")[];
+};
 export type OpenResult = {project: Project; recovered: boolean};
 export type StoreOptions = {
   /** How to delete a project folder. Default removes it; the app passes "move to trash". */
@@ -98,7 +111,9 @@ export class ProjectStore {
       /* none yet */
     }
     const {id, name, width, height, fps, backgroundColor} = project;
-    return {id, name, width, height, fps, backgroundColor, hasThumbnail, updatedAt: new Date(updatedAt).toISOString()};
+    const onTimeline = new Set(project.tracks.flatMap((t) => t.clips.map((c) => project.assets.find((a) => a.id === c.assetId)?.type)));
+    const kinds = (["video", "audio", "image"] as const).filter((k) => onTimeline.has(k));
+    return {id, name, width, height, fps, backgroundColor, hasThumbnail, updatedAt: new Date(updatedAt).toISOString(), durationFrames: projectDurationFrames(project), kinds};
   }
 
   private async readIndex(): Promise<ProjectSummary[] | null> {

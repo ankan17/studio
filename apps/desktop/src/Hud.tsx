@@ -15,12 +15,11 @@ export function Hud() {
   );
   const procs = m ? Object.entries(m.byProcess).sort((a, b) => b[1] - a[1]) : [];
   const hot = (m?.totalMB ?? 0) > 1000;
+  const detail = m ? `swap ${Math.round(m.swapMB)} MB\n${procs.map(([k, v]) => `${k} ${v} MB`).join("\n")}` : undefined;
   return (
-    <div className="mono flex items-center gap-3 text-[10.5px] text-faint" data-testid="hud">
-      <span className={hot ? "text-warn" : "text-dim"}>Memory {m?.totalMB ?? "–"} MB</span>
+    <div className="num flex min-w-0 items-center gap-3 text-[11px] text-ink-3" data-testid="hud" title={detail}>
+      <span className={hot ? "text-warn" : "text-ink-2"}>Memory {m?.totalMB ?? "–"} MB</span>
       <span>peak {peak}</span>
-      <span>swap {m ? Math.round(m.swapMB) : "–"}</span>
-      <span className="hidden truncate lg:inline">{procs.map(([k, v]) => `${k} ${v}`).join("  ")}</span>
     </div>
   );
 }

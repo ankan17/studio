@@ -9,19 +9,19 @@ export function Transport() {
   const height = useEditor((s) => s.project!.height);
   const {frame, playing, loop, duration} = usePlayback();
   const empty = duration === 0;
-  const second = fps;
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 pb-1 pt-2">
-      <div className="flex items-baseline gap-2" data-testid="timecode">
-        <span className="mono text-[17px] font-medium tracking-tight">{timecode(frame, fps)}</span>
-        <span className="mono text-xs text-faint">/ {timecode(duration, fps)}</span>
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center pt-2.5">
+      <div className="num flex items-baseline gap-1.5 whitespace-nowrap" data-testid="timecode">
+        <span className="text-[16px] font-medium leading-5">{timecode(frame, fps)}</span>
+        <span className="text-caption text-ink-3">/ {timecode(duration, fps)}</span>
       </div>
       <div className="flex items-center gap-1">
-        <button className="icon-btn" title="Go to start (Home)" disabled={empty} onClick={playback.toStart}><SkipStart /></button>
-        <button className="icon-btn" title="Back one frame (←)" disabled={empty} onClick={() => playback.step(-1)}><StepBack /></button>
+        <button className="icon-btn" title="Go to start (Home)" aria-label="Go to start" disabled={empty} onClick={playback.toStart}><SkipStart /></button>
+        <button className="icon-btn" title="Back one frame (←)" aria-label="Back one frame" disabled={empty} onClick={() => playback.step(-1)}><StepBack /></button>
         <button
-          className="mx-1 grid h-9 w-9 place-items-center rounded-full bg-[#ecedf0] text-[#0e0f11] shadow-[0_2px_10px_rgb(0_0_0/0.4)] transition hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
-          title="Play / pause (Space)"
+          className="mx-1.5 grid h-[38px] w-[38px] place-items-center rounded-full bg-go text-go-ink transition-[background-color,transform] duration-150 ease-[var(--ease-out)] hover:bg-go-hi active:scale-95 disabled:bg-raised disabled:text-ink-3"
+          title="Play or pause (Space)"
+          aria-label={playing ? "Pause" : "Play"}
           data-testid="play"
           aria-pressed={playing}
           disabled={empty}
@@ -29,13 +29,12 @@ export function Transport() {
         >
           {playing ? <Pause size={16} /> : <span className="translate-x-[1px]"><Play size={16} /></span>}
         </button>
-        <button className="icon-btn" title="Forward one frame (→)" disabled={empty} onClick={() => playback.step(1)}><StepFwd /></button>
-        <button className="icon-btn" title="Go to end (End)" disabled={empty} onClick={playback.toEnd}><SkipEnd /></button>
+        <button className="icon-btn" title="Forward one frame (→)" aria-label="Forward one frame" disabled={empty} onClick={() => playback.step(1)}><StepFwd /></button>
+        <button className="icon-btn" title="Go to end (End)" aria-label="Go to end" disabled={empty} onClick={playback.toEnd}><SkipEnd /></button>
       </div>
-      <div className="flex items-center justify-end gap-3 text-xs text-faint">
-        <span className="hidden gap-1 xl:flex"><span className="kbd">Space</span> play <span className="kbd">←</span><span className="kbd">→</span> frame <span className="kbd">⇧</span> {second}f</span>
-        <button className={`icon-btn ${loop ? "!bg-accent-soft !text-accent" : ""}`} title="Loop" aria-pressed={loop} onClick={playback.toggleLoop}><Loop /></button>
-        <span className="mono rounded-md border border-line px-2 py-1 text-[11px] text-dim">{width}×{height} · {fps}</span>
+      <div className="flex items-center justify-end gap-2">
+        <button className="icon-btn" title="Loop playback" aria-label="Loop" aria-pressed={loop} onClick={playback.toggleLoop}><Loop /></button>
+        <span className="num whitespace-nowrap rounded-[5px] border border-line px-2 py-[3px] text-caption text-ink-2">{width}×{height} · {fps} fps</span>
       </div>
     </div>
   );

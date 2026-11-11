@@ -5,6 +5,9 @@
     python3 scripts/verify/verify.py M2 --small    # shorter synthetic clips (quick check)
     python3 scripts/verify/verify.py M2 --skip-e2e # static checks only
 
+Visual regression (screenshots of every UI state against committed baselines) is separate:
+    python3 scripts/verify/visual.py [--update]    # see that file; review docs/reports/visual/index.html
+
 The report is written to docs/reports/<milestone>.md. Each milestone adds scripts/verify/e2e_<milestone>.py, which writes
 a results JSON (checks with evidence, metrics, notes). Hand-written notes for the milestone (what could not be
 automated, open issues) live in docs/reports/<milestone>.notes.md and are appended to the report.

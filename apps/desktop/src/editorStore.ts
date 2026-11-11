@@ -12,6 +12,9 @@ type EditorState = {
   recovered: boolean;
   saveState: SaveState;
   error: string | null;
+  /** The clip the inspector edits. UI state only, never saved. */
+  selectedClipId: string | null;
+  selectClip: (id: string | null) => void;
   open: (id: string) => Promise<void>;
   close: () => Promise<void>;
   /** Apply an immer recipe to the project and schedule a debounced autosave. */
@@ -47,14 +50,16 @@ export const useEditor = create<EditorState>((set, get) => {
     recovered: false,
     saveState: "saved",
     error: null,
+    selectedClipId: null,
+    selectClip: (id) => set({selectedClipId: id}),
     open: async (id) => {
       await get().flush();
       const {project, recovered, baseUrl} = await window.studio.projects.open(id);
-      set({project, baseUrl, recovered, saveState: "saved", error: null});
+      set({project, baseUrl, recovered, saveState: "saved", error: null, selectedClipId: null});
     },
     close: async () => {
       await get().flush();
-      set({project: null, recovered: false, saveState: "saved", error: null});
+      set({project: null, recovered: false, saveState: "saved", error: null, selectedClipId: null});
     },
     update: (recipe) => {
       const project = get().project;

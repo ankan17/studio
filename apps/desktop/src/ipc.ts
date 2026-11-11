@@ -141,6 +141,8 @@ export type ProjectCard = {
   fps: number;
   backgroundColor: string;
   thumbnailUrl: string | null;
+  durationFrames?: number;
+  kinds?: ("video" | "audio" | "image")[];
 };
 /** `baseUrl` is the media:// URL of the project folder; assets, proxies and thumbnails are served beneath it. */
 export type OpenedProject = {project: Project; recovered: boolean; baseUrl: string};

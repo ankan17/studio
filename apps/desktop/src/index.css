@@ -1,27 +1,71 @@
 @import "tailwindcss";
 
-/* Design tokens. One warm-graphite neutral ramp, one vermilion accent, three clip hues. */
+/* Studio design system: "Metro line".
+   The edit is a route through time. Neutrals are midnight-enamel graphite tinted toward hue 262; colour means media type
+   everywhere (video blue, audio purple, stills and titles yellow); green is "your line": the main action and the playhead.
+   Values are OKLCH-derived and every text colour passes WCAG AA on every surface (see DESIGN.md). */
+
+/* ---- bundled faces (SIL OFL, licences beside the files) */
+@font-face { font-family: "Fira Sans"; font-weight: 400; font-display: block; src: url("./assets/fonts/FiraSans-latin-400.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2190-2199, U+2212, U+2215, U+21E7, U+2318; }
+@font-face { font-family: "Fira Sans"; font-weight: 500; font-display: block; src: url("./assets/fonts/FiraSans-latin-500.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2190-2199, U+2212, U+2215, U+21E7, U+2318; }
+@font-face { font-family: "Fira Sans"; font-weight: 600; font-display: block; src: url("./assets/fonts/FiraSans-latin-600.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2190-2199, U+2212, U+2215, U+21E7, U+2318; }
+@font-face { font-family: "Fira Sans"; font-weight: 400; font-display: block; src: url("./assets/fonts/FiraSans-latin-ext-400.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Fira Sans"; font-weight: 500; font-display: block; src: url("./assets/fonts/FiraSans-latin-ext-500.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Fira Sans"; font-weight: 600; font-display: block; src: url("./assets/fonts/FiraSans-latin-ext-600.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Fira Mono"; font-weight: 400; font-display: block; src: url("./assets/fonts/FiraMono-latin-400.woff2") format("woff2"); }
+@font-face { font-family: "Fira Mono"; font-weight: 500; font-display: block; src: url("./assets/fonts/FiraMono-latin-500.woff2") format("woff2"); }
+/* Bengali project and clip names in the UI; the same file the composition uses for titles. */
+@font-face { font-family: "Noto Sans Bengali UI"; font-weight: 100 900; font-display: block; src: url("./assets/fonts/NotoSansBengali.ttf") format("truetype"); unicode-range: U+0951-0952, U+0964-0965, U+0980-09FE, U+1CD0, U+1CD2, U+1CD5-1CD6, U+1CD8, U+1CE1, U+1CEA, U+1CED, U+1CF2, U+1CF5-1CF7, U+200C-200D, U+20B9, U+25CC, U+A8F1; }
+
 @theme {
-  --color-bg: #0e0f11;
-  --color-panel: #141518;
-  --color-raised: #1a1b1f;
-  --color-hover: #212227;
-  --color-line: rgb(255 255 255 / 0.07);
-  --color-line-strong: rgb(255 255 255 / 0.13);
-  --color-ink: #ecedf0;
-  --color-dim: #9b9da8;
-  --color-faint: #666874;
-  --color-accent: #ff6a3d;
-  --color-accent-hi: #ff8661;
-  --color-accent-soft: rgb(255 106 61 / 0.14);
-  --color-video: #6577ff;
-  --color-audio: #2dbf9a;
-  --color-still: #e6a93b;
-  --color-danger: #ff5d6c;
-  --color-warn: #f2b84b;
-  --font-sans: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
-  --font-mono: "SF Mono", ui-monospace, Menlo, monospace;
-  --radius-panel: 10px;
+  /* neutrals: oklch(L 0.016-0.022 262) */
+  --color-ground: #0b0e15; /* window, around the picture */
+  --color-surface: #12161e; /* panels */
+  --color-raised: #1a1f29; /* controls, tiles */
+  --color-hover: #222833;
+  --color-line: #303640; /* control borders */
+  --color-line-soft: #232832; /* panel borders, dividers */
+  --color-ink: #eaedf2; /* 15.4:1 on surface */
+  --color-ink-2: #b8bec8; /* secondary, 9.7:1 */
+  --color-ink-3: #959ca7; /* captions, 6.6:1 (lowest text contrast in the app) */
+  --color-frame: #05070b; /* letterbox around the picture; never pure black */
+
+  /* your line: primary action, selection, playhead */
+  --color-go: #4bc680;
+  --color-go-hi: #5fd290;
+  --color-go-ink: #0a1a10; /* text on go, 8.3:1 */
+  --color-go-text: #72d699; /* green text on dark */
+  --color-go-soft: rgb(75 198 128 / 0.14);
+
+  /* lines: media types */
+  --color-video: #639be1;
+  --color-audio: #ad87d7;
+  --color-still: #e6c465;
+
+  /* state */
+  --color-warn: #f4a859;
+  --color-danger: #ef6661;
+
+  --font-sans: "Fira Sans", "Noto Sans Bengali UI", system-ui, sans-serif;
+  --font-mono: "Fira Mono", "Noto Sans Bengali UI", ui-monospace, monospace;
+
+  /* type scale: title, heading, body, label, caption, tag */
+  --text-title: 22px;
+  --text-title--line-height: 28px;
+  --text-heading: 15px;
+  --text-heading--line-height: 20px;
+  --text-body: 13px;
+  --text-body--line-height: 20px;
+  --text-label: 12.5px;
+  --text-label--line-height: 16px;
+  --text-caption: 11.5px;
+  --text-caption--line-height: 16px;
+  --text-tag: 10.5px;
+  --text-tag--line-height: 14px;
+
+  --radius-control: 6px;
+  --radius-panel: 8px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 :root {
@@ -34,27 +78,27 @@ html, body, #react-root {
 
 body {
   margin: 0;
-  background: var(--color-bg);
+  background: var(--color-ground);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.4;
-  letter-spacing: -0.005em;
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;
+  caret-color: var(--color-go);
 }
 
 ::selection {
-  background: var(--color-accent-soft);
+  background: rgb(75 198 128 / 0.32);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+  scrollbar-color: var(--color-line) transparent;
 }
 
-/* In the base layer so Tailwind's utilities (text-accent, text-dim, ...) can override them. */
+/* In the base layer so Tailwind utilities can override them. */
 @layer base {
   button {
     font: inherit;
@@ -65,6 +109,34 @@ body {
     font: inherit;
     color: inherit;
     user-select: text;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-go-text);
+    outline-offset: 2px;
+  }
+  /* neutral slider: line track, ink fill (set --pct), ink thumb */
+  input[type="range"] {
+    appearance: none;
+    height: 16px;
+    background: transparent;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, var(--color-ink-2) var(--pct, 0%), var(--color-line) var(--pct, 0%));
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border-radius: 7px;
+    background: var(--color-ink);
+    box-shadow: 0 1px 3px rgb(5 7 11 / 0.5);
+    transition: transform 120ms var(--ease-out);
+  }
+  input[type="range"]:active::-webkit-slider-thumb {
+    transform: scale(1.12);
   }
 }
 
@@ -77,21 +149,29 @@ body {
 
 @layer components {
   .panel {
-    background: var(--color-panel);
-    border: 1px solid var(--color-line);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line-soft);
     border-radius: var(--radius-panel);
   }
-  .eyebrow {
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    color: var(--color-faint);
-  }
-  .mono {
+  /* measurements: timecode, durations, dimensions, fps (counts and dates use .tnum) */
+  .num {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  /* the only uppercase in the app: track tags (V1, A1) */
+  .tag {
+    font-size: var(--text-tag);
+    line-height: var(--text-tag--line-height);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .measure {
+    max-width: 68ch;
   }
 
   .btn {
@@ -99,93 +179,100 @@ body {
     align-items: center;
     gap: 6px;
     height: 28px;
-    padding: 0 11px;
-    border-radius: 7px;
+    padding: 0 12px;
+    border-radius: var(--radius-control);
     background: var(--color-raised);
-    border: 1px solid var(--color-line-strong);
-    font-size: 12px;
+    border: 1px solid var(--color-line);
+    font-size: var(--text-label);
     font-weight: 500;
     white-space: nowrap;
-    transition: background 0.12s, border-color 0.12s, transform 0.06s;
+    transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), transform 120ms var(--ease-out);
   }
   .btn:hover:not(:disabled) {
     background: var(--color-hover);
   }
   .btn:active:not(:disabled) {
-    transform: translateY(0.5px);
+    transform: scale(0.97);
   }
   .btn:disabled {
-    opacity: 0.4;
+    opacity: 0.45;
   }
-  .btn-primary {
-    background: var(--color-accent);
+  .btn-go {
+    background: var(--color-go);
     border-color: transparent;
-    color: #1a0b05;
+    color: var(--color-go-ink);
     font-weight: 600;
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 1px 8px rgb(255 106 61 / 0.25);
   }
-  .btn-primary:hover:not(:disabled) {
-    background: var(--color-accent-hi);
+  .btn-go:hover:not(:disabled) {
+    background: var(--color-go-hi);
   }
   .btn-ghost {
     background: transparent;
     border-color: transparent;
+    color: var(--color-ink-2);
   }
-  .btn-danger {
-    color: var(--color-danger);
+  .btn-ghost:hover:not(:disabled) {
+    color: var(--color-ink);
   }
+
   .icon-btn {
     display: inline-grid;
     place-items: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
-    color: var(--color-dim);
-    transition: background 0.12s, color 0.12s;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-control);
+    color: var(--color-ink-2);
+    transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out), transform 120ms var(--ease-out);
   }
   .icon-btn:hover:not(:disabled) {
     background: var(--color-hover);
     color: var(--color-ink);
   }
-  .icon-btn:disabled {
-    opacity: 0.3;
+  .icon-btn:active:not(:disabled) {
+    transform: scale(0.94);
   }
-  .btn:focus-visible, .icon-btn:focus-visible, .field:focus-visible, .seg button:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 1px;
+  .icon-btn:disabled {
+    opacity: 0.35;
+  }
+  .icon-btn[aria-pressed="true"] {
+    background: var(--color-go-soft);
+    color: var(--color-go-text);
   }
 
   .field {
     height: 28px;
     padding: 0 10px;
-    border-radius: 7px;
-    background: var(--color-bg);
-    border: 1px solid var(--color-line-strong);
-    font-size: 12px;
+    border-radius: var(--radius-control);
+    background: var(--color-ground);
+    border: 1px solid var(--color-line);
+    font-size: var(--text-label);
     outline: none;
+    transition: border-color 150ms var(--ease-out);
   }
   .field:focus {
-    border-color: var(--color-accent);
+    border-color: var(--color-go);
   }
   .field::placeholder {
-    color: var(--color-faint);
+    color: var(--color-ink-3);
   }
 
   .seg {
-    display: inline-flex;
+    display: flex;
     padding: 2px;
-    gap: 1px;
-    border-radius: 8px;
-    background: var(--color-bg);
-    border: 1px solid var(--color-line);
+    gap: 2px;
+    border-radius: 7px;
+    background: var(--color-ground);
+    border: 1px solid var(--color-line-soft);
   }
   .seg button {
-    height: 22px;
-    padding: 0 9px;
-    border-radius: 6px;
-    font-size: 11.5px;
+    flex: 1;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 5px;
+    font-size: 12px;
     font-weight: 500;
-    color: var(--color-dim);
+    color: var(--color-ink-2);
+    transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out);
   }
   .seg button:hover {
     color: var(--color-ink);
@@ -193,35 +280,47 @@ body {
   .seg button[aria-pressed="true"] {
     background: var(--color-hover);
     color: var(--color-ink);
-    box-shadow: 0 0 0 1px var(--color-line-strong);
   }
 
-  .kbd {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    padding: 1px 5px;
-    border-radius: 4px;
-    background: var(--color-bg);
-    border: 1px solid var(--color-line-strong);
-    color: var(--color-dim);
+  /* line roundel: a media type's colour, the same mark in the media panel, the inspector and the timeline */
+  .roundel {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--color-ground);
   }
 }
 
-@keyframes shimmer {
-  to {
-    background-position: -200% 0;
-  }
-}
-.shimmer {
-  background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.09) 50%, transparent 70%) 0 0 / 200% 100%, var(--color-raised);
-  animation: shimmer 1.6s linear infinite;
-}
-@keyframes rise {
+/* The one authored entrance: a dialog grows from 97% while its scrim fades. Nothing else animates in. */
+@keyframes dialog-in {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.99);
+    transform: scale(0.97);
   }
 }
-.rise {
-  animation: rise 0.18s ease-out;
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+.dialog-in {
+  animation: dialog-in 180ms var(--ease-out);
+}
+.scrim-in {
+  animation: scrim-in 150ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog-in, .scrim-in {
+    animation: none;
+  }
+  .btn, .icon-btn {
+    transition: none;
+  }
 }

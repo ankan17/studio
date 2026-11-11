@@ -10,3 +10,6 @@ dist
 *.MP4
 *.mov
 .claude/
+
+# visual test output (baselines live in scripts/verify/visual-baselines)
+docs/reports/visual/

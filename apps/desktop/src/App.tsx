@@ -20,6 +20,10 @@ export function App() {
       },
       project: () => useEditor.getState().project,
       clearTimeline: () => useEditor.getState().update((p) => void (p.tracks = [])),
+      patchClip: (id: string, patch: {startFrame?: number; durationInFrames?: number}) =>
+        useEditor.getState().update((p) => {
+          for (const t of p.tracks) for (const c of t.clips) if (c.id === id) Object.assign(c, patch);
+        }),
     };
   }, []);
   return hasProject ? <Editor /> : <Dashboard />;
