@@ -1,6 +1,6 @@
 # Studio Video Editor: Project Plan
 
-> Exported from the Claude Docs plan "Studio Video Editor: Project Plan" (https://claude.ai/artifact/PXtzMhasq6GKDU3oH1MBut) on 2026-11-11. The live doc is the source of truth; diagrams exist only there.
+> Exported from the Claude Docs plan "Studio Video Editor: Project Plan" (https://claude.ai/artifact/PXtzMhasq6GKDU3oH1MBut) on 2026-11-12. The live doc is the source of truth; diagrams exist only there.
 
 Nov 10, 2026 · @Ankan
 
@@ -242,14 +242,16 @@ Exit: rough-cut a 10-clip vlog by hand. Fifty undo and redo steps leave the proj
 
 ### M5 Editing features
 
-- [ ] Text clips with style controls and entrance and exit presets
-- [ ] Audio volume, mute, fades, detach audio from video
-- [ ] Speed with ripple
-- [ ] Crop, fit mode, flip, rotation, opacity
-- [ ] Fade and dissolve transitions with handle validation
-- [ ] Markers
+- [x] Text clips with style controls and entrance and exit presets
+- [x] Audio volume, mute, fades, detach audio from video
+- [x] Speed with ripple
+- [x] Crop, fit mode, flip, rotation, opacity
+- [x] Fade and dissolve transitions with handle validation
+- [x] Markers
 
 Exit: a complete vlog with music, titles and transitions, no external tool.
+
+**Status: built and verified.** 78 of 78 checks pass (`docs/reports/M5.md`): a complete vlog with music, two titles, a dissolve and a slide made in the real app, saved, reopened identically and played through in real time. Transitions sit centred on the cut (clip positions never move) and come as dissolve, slide and wipe; titles have fade, slide up, pop and typewriter, which never splits a Bengali conjunct; crop is set on the preview or in the inspector. Schema v1 is unchanged. Also fixed: playback jumped back to frame 0 at the end (an M3 bug). Not yet checked: sound by ear (speed changes pitch) and export fidelity, which M6's golden-frame test covers. Still to confirm on the 8GB Mac: the vlog with real footage and the memory bars (809MB total, 416MB editor tab on the dev Mac).
 
 ### M6 Export
 
