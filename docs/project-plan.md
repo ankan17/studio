@@ -201,8 +201,8 @@ Exit: create, close and reopen a project. Killing the app mid-save leaves a load
 - [x] Native import dialog and drag from Finder, copied into `assets/` with hash de-duplication
 - [x] Mediabunny metadata: duration, fps, dimensions, rotation, codec, audio channels
 - [x] Proxy queue at 720p H.264 constant frame rate for every video, so the frame rate is constant, cancellable, in a hidden worker window
-- [ ] Spike 4 result: no separate normalise step; the 720p proxy already converts HDR to SDR, and preview and export match (about 4 to 9 luma levels lighter than Apple's rendering). Send HEVC 10-bit and HDR sources through the proxy queue even at 1080p30, and tune the tone at proxy creation if the lift is too visible
-- [ ] Portrait sources: size the proxy to the real picture, not pillarboxed inside 1280x720 (spike 4)
+- [x] Spike 4 result: no separate normalise step; the 720p proxy already converts HDR to SDR, and preview and export match (about 4 to 9 luma levels lighter than Apple's rendering). Send HEVC 10-bit and HDR sources through the proxy queue even at 1080p30, and tune the tone at proxy creation if the lift is too visible
+- [x] Portrait sources: size the proxy to the real picture, not pillarboxed inside 1280x720 (spike 4)
 - [x] Thumbnails and filmstrip sprite strips into `cache/`
 - [x] Waveform peak files into `cache/`
 - [x] Media panel: grid, search, filter, duration and resolution, unused-asset cleanup, missing-media relink

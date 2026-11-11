@@ -68,6 +68,38 @@ describe("ProjectStore", () => {
     await fs.writeFile(path.join(root, "index.json"), "not json");
     expect((await store.list()).map((s) => s.id)).toEqual([p.id]);
   });
+  it("recovers the previous save rather than an older snapshot", async () => {
+    let t = 1_000_000;
+    const s = new ProjectStore(root, {snapshotEveryMs: 60_000, now: () => t++}); // only create() takes a snapshot
+    const p = await s.create(fmt);
+    for (const name of ["v1", "v2", "v3"]) await s.save({...p, name});
+    expect(await fs.readdir(path.join(s.dir(p.id), "recovery"))).toHaveLength(1);
+    await fs.writeFile(path.join(s.dir(p.id), "project.json"), "{"); // damaged
+    const {project, recovered} = await s.open(p.id);
+    expect(recovered).toBe(true);
+    expect(project.name).toBe("v2"); // .prev, one save old; the snapshot would lose v1 to v3
+  });
+  it("recovers the latest save when that save took a snapshot", async () => {
+    const p = await store.create(fmt); // snapshotEveryMs 0: every save snapshots
+    for (const name of ["v1", "v2"]) await store.save({...p, name});
+    await fs.writeFile(path.join(store.dir(p.id), "project.json"), "{");
+    expect((await store.open(p.id)).project.name).toBe("v2");
+  });
+  it("never replaces the previous copy with a damaged project.json", async () => {
+    const p = await store.create(fmt);
+    await store.save({...p, name: "v1"});
+    const file = path.join(store.dir(p.id), "project.json");
+    await fs.writeFile(file, "{");
+    await store.save({...p, name: "v2"});
+    expect(JSON.parse(await fs.readFile(`${file}.prev`, "utf8")).name).toBe("Trip");
+  });
+  it("keeps 20 snapshots by default", async () => {
+    let t = 1;
+    const s = new ProjectStore(root, {snapshotEveryMs: 0, now: () => t++});
+    const p = await s.create(fmt);
+    for (let i = 0; i < 25; i++) await s.save({...p, name: `v${i}`});
+    expect((await fs.readdir(path.join(s.dir(p.id), "recovery"))).length).toBe(20);
+  });
   it("keeps only the newest snapshots", async () => {
     let t = 1;
     const s = new ProjectStore(root, {snapshotEveryMs: 0, keepSnapshots: 3, now: () => t++});

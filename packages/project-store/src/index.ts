@@ -2,7 +2,7 @@
 //   <root>/index.json                 mirror of project summaries (rebuildable by scanning)
 //   <root>/<id>/project.json          source of truth
 //   <root>/<id>/project.json.prev     previous good copy
-//   <root>/<id>/recovery/<ms>.json    periodic snapshots (newest 10 kept)
+//   <root>/<id>/recovery/<ms>.json    periodic snapshots (newest 20 kept)
 //   <root>/<id>/assets, cache, thumbnail.jpg
 // Ids come from the renderer, so every id is checked to be a UUID before it touches a path.
 import {convertProjectFps, createProject, migrateProject, projectDurationFrames, type Fps, type Project} from "@studio/schema";
@@ -37,6 +37,15 @@ export type StoreOptions = {
   keepSnapshots?: number;
 };
 
+function isValidProject(json: string): boolean {
+  try {
+    migrateProject(JSON.parse(json));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class ProjectStore {
@@ -54,7 +63,7 @@ export class ProjectStore {
     this.now = opts.now ?? Date.now;
     this.remove = opts.remove ?? ((dir) => fs.rm(dir, {recursive: true, force: true}));
     this.snapshotEveryMs = opts.snapshotEveryMs ?? 30_000;
-    this.keepSnapshots = opts.keepSnapshots ?? 10;
+    this.keepSnapshots = opts.keepSnapshots ?? 20;
   }
 
   // All mutations run one at a time so index and project writes never interleave.
@@ -86,7 +95,9 @@ export class ProjectStore {
     const dir = this.dir(id);
     const main = await this.readValid(path.join(dir, "project.json"));
     if (main && main.id === id) return {project: main, recovered: false};
-    // project.json missing or damaged: newest valid snapshot, then the previous copy
+    // project.json missing or damaged: the most recently written valid copy wins. `.prev` is one save old, while the
+    // newest snapshot can be up to snapshotEveryMs old, or the latest save itself when that save took one. Ties go to
+    // the snapshot (written after `.prev` in the same save); the sort is stable and snapshots come first.
     const candidates: string[] = [];
     try {
       const names = (await fs.readdir(path.join(dir, "recovery"))).filter((n) => n.endsWith(".json")).sort().reverse();
@@ -95,7 +106,9 @@ export class ProjectStore {
       /* no snapshots */
     }
     candidates.push(path.join(dir, "project.json.prev"));
-    for (const file of candidates) {
+    const dated = await Promise.all(candidates.map(async (file) => ({file, t: (await fs.stat(file).catch(() => null))?.mtimeMs})));
+    const ordered = dated.filter((d): d is {file: string; t: number} => d.t !== undefined).sort((a, b) => b.t - a.t);
+    for (const {file} of ordered) {
       const p = await this.readValid(file);
       if (p && p.id === id) return {project: p, recovered: true};
     }
@@ -177,8 +190,10 @@ export class ProjectStore {
     await fs.mkdir(path.join(dir, "recovery"), {recursive: true});
     const file = path.join(dir, "project.json");
     const json = JSON.stringify(project, null, 2);
-    // keep the previous good copy first (a crash while copying leaves project.json untouched)
-    await fs.copyFile(file, `${file}.prev`).catch(() => undefined);
+    // Keep the previous good copy first. Written fresh rather than copied, so it is atomic and its mtime says when it
+    // became the previous copy (open() compares it with the snapshots). A damaged project.json never replaces it.
+    const previous = await fs.readFile(file, "utf8").catch(() => null);
+    if (previous !== null && isValidProject(previous)) await writeFileAtomic(`${file}.prev`, previous);
     await writeFileAtomic(file, json);
     const t = this.now();
     if (t - (this.lastSnapshot.get(project.id) ?? 0) >= this.snapshotEveryMs) {

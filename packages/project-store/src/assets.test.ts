@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {afterEach, beforeEach, describe, expect, it} from "vitest";
-import {findMissing, ImportError, importAssetFile, removeAssetFiles, sweepPartials, sweepStaleImports, cacheFile} from "./assets";
+import {findMissing, ImportError, importAssetFile, removeAssetFiles, sweepOrphanAssets, sweepPartials, sweepStaleImports, cacheFile} from "./assets";
 
 let tmp: string;
 let proj: string;
@@ -87,6 +87,17 @@ describe("asset helpers", () => {
     await sweepPartials(proj);
     expect(await fs.readdir(path.join(proj, "cache"))).toEqual(["keep.jpg"]);
     expect(await fs.readdir(path.join(proj, "assets"))).toEqual([".import-live.tmp"]);
+  });
+  it("removes unreferenced asset copies and their caches once they are stale", async () => {
+    const kept = await importAssetFile(proj, await write("kept.mp4", "kept"));
+    const orphan = await importAssetFile(proj, await write("orphan.mp4", "orphan"));
+    await fs.mkdir(path.join(proj, "cache"));
+    await fs.writeFile(cacheFile(proj, orphan.sha256, "thumb.jpg"), "t");
+    await fs.writeFile(path.join(proj, "assets", ".import-live.tmp"), "copying");
+    expect(await sweepOrphanAssets(proj, [kept.sha256])).toEqual([]); // fresh: may still be on its way into the manifest
+    expect(await sweepOrphanAssets(proj, [kept.sha256], Date.now() + 11 * 60_000)).toEqual([orphan.sha256]);
+    expect((await fs.readdir(path.join(proj, "assets"))).sort()).toEqual([".import-live.tmp", `${kept.sha256}.mp4`]);
+    expect(await fs.readdir(path.join(proj, "cache"))).toEqual([]);
   });
   it("removes import temp files only once they are stale", async () => {
     await fs.mkdir(path.join(proj, "assets"));

@@ -112,6 +112,29 @@ export async function sweepPartials(projectDir: string): Promise<void> {
   }
 }
 
+/**
+ * Delete asset copies, with their derived files, that the saved manifest does not reference and that nothing can still
+ * be writing (older than ten minutes). A file copied just before the window closed, inside the autosave debounce, ends
+ * up like this. Run only when a project opens normally: after a recovery, the damaged newer save may still use them.
+ * Returns the hashes removed.
+ */
+export async function sweepOrphanAssets(projectDir: string, referenced: Iterable<string>, now = Date.now()): Promise<string[]> {
+  const keep = new Set(referenced);
+  const dir = path.join(projectDir, "assets");
+  const removed: string[] = [];
+  for (const name of await fs.readdir(dir).catch(() => [] as string[])) {
+    const dot = name.indexOf(".");
+    const sha256 = name.slice(0, dot);
+    const ext = name.slice(dot + 1);
+    if (dot < 0 || !isSha256(sha256) || !(ext in MEDIA_EXTENSIONS) || keep.has(sha256)) continue;
+    const stat = await fs.stat(path.join(dir, name)).catch(() => null);
+    if (!stat || now - stat.mtimeMs <= 10 * 60_000) continue;
+    await removeAssetFiles(projectDir, sha256, ext);
+    removed.push(sha256);
+  }
+  return removed;
+}
+
 /** Remove import temp files that nothing can still be writing (older than ten minutes). Run when a project opens. */
 export async function sweepStaleImports(projectDir: string, now = Date.now()): Promise<void> {
   const dir = path.join(projectDir, "assets");

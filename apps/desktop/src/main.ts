@@ -1,4 +1,4 @@
-import {cacheFile, fileExists, findMissing, importAssetFile, ImportError, ProjectStore, removeAssetFiles, sweepStaleImports, type ImportedFile} from "@studio/project-store";
+import {cacheFile, fileExists, findMissing, importAssetFile, ImportError, ProjectStore, removeAssetFiles, sweepOrphanAssets, sweepStaleImports, type ImportedFile} from "@studio/project-store";
 import {app, BrowserWindow, dialog, ipcMain, session, shell, type IpcMainInvokeEvent} from "electron";
 import fs from "node:fs";
 import path from "node:path";
@@ -100,7 +100,12 @@ async function toCard(s: Awaited<ReturnType<ProjectStore["list"]>>[number]): Pro
 
 handle(IPC.projects.list, null, async () => Promise.all((await store.list()).map(toCard)));
 handle(IPC.projects.create, Req.create, (req) => store.create(req));
-handle(IPC.projects.open, Req.id, async ({id}) => ({...(await store.open(id)), baseUrl: mediaUrl(store.dir(id))}));
+handle(IPC.projects.open, Req.id, async ({id}) => {
+  const opened = await store.open(id);
+  // Copies that never made it into a saved manifest (window closed inside the autosave debounce). Not after a recovery.
+  if (!opened.recovered) await sweepOrphanAssets(store.dir(id), opened.project.assets.map((a) => a.sha256)).catch(() => undefined);
+  return {...opened, baseUrl: mediaUrl(store.dir(id))};
+});
 handle(IPC.projects.save, Req.save, ({project}) => store.save(project));
 handle(IPC.projects.rename, Req.rename, ({id, name}) => store.rename(id, name));
 handle(IPC.projects.duplicate, Req.duplicate, ({id, fps}) => store.duplicate(id, {fps}));

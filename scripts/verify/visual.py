@@ -311,8 +311,8 @@ def main():
 
         # ---- recovery banner: tear project.json of the first project; it opens from a snapshot
         page.wait_for_selector("[aria-label='Open Visual test']")
-        # Drop the 30s snapshots so it always opens from project.json.prev; otherwise the result depends on when the
-        # last snapshot happened to land (open() prefers any snapshot over .prev, see the M4 notes).
+        # Drop the 30s snapshots so it always opens from project.json.prev. open() takes the newest valid copy, which is
+        # the latest save when that save happened to take a snapshot, so the picture would depend on timing.
         shutil.rmtree(work / "projects" / pid / "recovery", ignore_errors=True)
         (work / "projects" / pid / "project.json").write_text('{"schemaVersion":1,"id":')
         page.click("[aria-label='Open Visual test']")
