@@ -8,6 +8,11 @@ export const IPC = {
   metrics: "studio:metrics",
   flushRequest: "studio:flush-request", // main -> renderer: save now, the window is closing
   flushDone: "studio:flush-done",
+  showShortcuts: "studio:show-shortcuts", // main -> renderer: the Help menu asked for the shortcut sheet
+  app: {
+    info: "app:info",
+    logError: "app:log-error",
+  },
   media: {
     import: "media:import",
     importPaths: "media:import-paths",
@@ -72,6 +77,8 @@ export const Req = {
       .refine((b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff, "Thumbnail must be a JPEG"),
   }),
 } as const;
+
+export const FlushReq = z.object({ok: z.boolean(), error: z.string().max(500).optional()});
 
 const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
 const ext = z.enum(["mp4", "mov", "m4v", "mp3", "m4a", "wav", "jpg", "jpeg", "png"]);
@@ -208,7 +215,15 @@ export type StudioApi = {
   onMetrics: (listener: (m: MemoryMetrics) => void) => () => void;
   /** Main asks the renderer to save before the window closes; the renderer must call flushDone() afterwards. */
   onFlushRequest: (listener: () => void) => () => void;
-  flushDone: () => Promise<void>;
+  /** `ok` is false when the save did not go through (a full disk, say): main then asks before closing the window. */
+  flushDone: (result: {ok: boolean; error?: string}) => Promise<void>;
+  onShowShortcuts: (listener: () => void) => () => void;
+  app: {
+    /** Version, and whether the last session ended without a clean quit. The crash flag is given once. */
+    info: () => Promise<{version: string; previousCrash: boolean}>;
+    /** Errors that reach window.onerror or an unhandled rejection go to the local log (nowhere else). */
+    logError: (message: string, stack?: string) => Promise<void>;
+  };
   media: {
     /** Native multi-select dialog in main, then copy into the project. Resolves with nothing imported if cancelled. */
     import: (projectId: string) => Promise<ImportOutcome>;

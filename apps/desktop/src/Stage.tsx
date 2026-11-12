@@ -49,8 +49,21 @@ export function Stage() {
         {total === 0 && (
           <div className="absolute inset-0 grid place-items-center bg-frame p-6 text-center">
             <div className="grid max-w-[34ch] justify-items-center gap-1.5">
-              <div className="text-heading font-semibold">Nothing on the timeline yet</div>
-              <p className="m-0 text-body text-ink-2">Import media, then press + on a clip, or double-click it, to add it here.</p>
+              {project.assets.length === 0 ? (
+                <>
+                  <div className="text-heading font-semibold">Start with your clips</div>
+                  <ol className="m-0 grid list-none gap-1 p-0 text-left text-body text-ink-2">
+                    <li><span className="num mr-2 text-go-text">1</span>Import media on the left, or drag clips in from Finder.</li>
+                    <li><span className="num mr-2 text-go-text">2</span>Press + on a clip, or double-click it, to put it on the timeline.</li>
+                    <li><span className="num mr-2 text-go-text">3</span>Press Space to watch it, S to cut, then Export.</li>
+                  </ol>
+                </>
+              ) : (
+                <>
+                  <div className="text-heading font-semibold">Nothing on the timeline yet</div>
+                  <p className="m-0 text-body text-ink-2">Import media, then press + on a clip, or double-click it, to add it here.</p>
+                </>
+              )}
             </div>
           </div>
         )}

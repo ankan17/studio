@@ -2,9 +2,12 @@ import {applyCommand, History, type Command} from "@studio/editor-core";
 import {produce} from "immer";
 import type {Project} from "@studio/schema";
 import {create} from "zustand";
+import {cleanIpcMessage} from "./ui";
 
 export type SaveState = "saved" | "dirty" | "saving" | "error";
 const AUTOSAVE_MS = 800;
+/** After a failed save (full disk, unplugged drive) the save is tried again this often. */
+const RETRY_MS = 5000;
 
 type EditorState = {
   project: Project | null;
@@ -69,7 +72,10 @@ export const useEditor = create<EditorState>((set, get) => {
         // edits made while saving keep the state dirty and are saved by their own timer
         set((s) => ({saveState: s.project === project ? "saved" : "dirty", error: null}));
       } catch (err) {
-        set({saveState: "error", error: err instanceof Error ? err.message : String(err)});
+        set({saveState: "error", error: cleanIpcMessage(err)});
+        // A full disk or an unplugged drive may come right: keep trying, so the user need not remember to.
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => void saveNow(), RETRY_MS);
       }
     });
     return inFlight;

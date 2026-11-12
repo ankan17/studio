@@ -2,7 +2,15 @@ import {VitePlugin} from "@electron-forge/plugin-vite";
 
 // Export uses the web renderer inside the app, so no Remotion compositor binaries or bundled browser are packaged.
 const config = {
-  packagerConfig: {asar: true},
+  packagerConfig: {
+    asar: true,
+    name: "Studio",
+    appBundleId: "com.ankan17.studio",
+    appCategoryType: "public.app-category.video",
+    icon: "assets/icon", // assets/icon.icns, drawn by assets/make-icon.py
+    // V1 is not signed with a Developer ID and not notarised (no paid Apple Developer account). scripts/make-dmg.sh gives the
+    // app an ad-hoc signature, which Apple Silicon needs to run it; the first launch goes through System Settings, Privacy & Security, Open Anyway.
+  },
   rebuildConfig: {},
   plugins: [
     new VitePlugin({

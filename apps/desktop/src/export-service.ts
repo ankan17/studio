@@ -2,13 +2,14 @@
 // renderer. The renderer process only says which project and which size: main reads the project from disk, asks for
 // the destination in a native save dialog, writes the chunks the render window sends to `<file>.part`, and renames it
 // into place only when the render succeeded. The window is destroyed after every export, whatever the outcome.
-import {addExport, exportLogFile, fileExists, readExports, type ProjectStore} from "@studio/project-store";
+import {addExport, assertFreeSpace, exportLogFile, fileExists, friendlyErrorText, friendlyFsError, NotEnoughSpaceError, readExports, type ProjectStore} from "@studio/project-store";
 import {exportFileName, exportSize, nextExportVersion, projectDurationFrames, type ExportHeight, type ExportRecord} from "@studio/schema";
 import {BrowserWindow, ipcMain, type IpcMainInvokeEvent} from "electron";
 import {randomUUID} from "node:crypto";
 import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import {EXPORT_BITRATE} from "./export-settings";
 import {IPC, RenderReq, type ExportEvent, type ExportStart, type RenderJob} from "./ipc";
 import {mediaUrl} from "./media-protocol";
 
@@ -40,7 +41,19 @@ export type ExportServiceOptions = {
   emit: (e: ExportEvent) => void;
   /** Native save dialog (stubbed in end-to-end runs). Null when cancelled. */
   pickSavePath: (suggestedName: string) => Promise<string | null>;
+  /** True while an export runs, false after: main pauses the media queue in between. */
+  onBusy?: (busy: boolean) => void;
 };
+
+/** A render that fails on a vanished file says "media://local/.../assets/<sha>.mp4: 404"; say which file, in words. */
+export function describeRenderError(error: string, project: {assets: {name?: string; relativePath: string}[]}): string {
+  const disk = friendlyErrorText(error);
+  if (disk) return disk;
+  const sha = /assets\/([0-9a-f]{64})\./.exec(error)?.[1];
+  const asset = sha ? project.assets.find((a) => a.relativePath.includes(sha)) : undefined;
+  if (asset) return `The file "${asset.name ?? path.basename(asset.relativePath)}" could not be read, so the export stopped. If it was moved or deleted, relink it in the media panel and export again.`;
+  return error;
+}
 
 export class ExportService {
   private running: Running | null = null;
@@ -126,6 +139,12 @@ export class ExportService {
     const rel = path.relative(store.root, path.resolve(dest));
     if (!rel.startsWith("..") && !path.isAbsolute(rel)) throw new Error("Choose a folder outside Studio's project storage.");
 
+    // The file is about bitrate times length; add a margin for the container and for other things writing to the disk.
+    const estimate = Math.round((EXPORT_BITRATE[height] / 8) * (totalFrames / project.fps) * 1.25) + 100e6;
+    await assertFreeSpace(path.dirname(path.resolve(dest)), estimate).catch((err: unknown) => {
+      throw err instanceof NotEnoughSpaceError ? new Error(`${err.message} Free some space or choose another disk.`) : err;
+    });
+
     const exportId = randomUUID();
     const jobId = randomUUID();
     const size = exportSize(project.width, project.height, height);
@@ -135,13 +154,15 @@ export class ExportService {
     const finished = new Promise<string | undefined>((resolve) => (finish = resolve));
     const run: Running = {exportId, projectId, jobId, dest, part, handle: null, startedAt, touch: Date.now(), cancelled: false, finish};
     this.running = run; // set before any await, so a second start cannot slip in
+    this.opts.onBusy?.(true);
     this.loggedStep = 0;
     try {
       await fs.mkdir(path.join(dir, "exports"), {recursive: true});
       run.handle = await fs.open(part, "w"); // fails here, with the OS message, if the folder cannot be written
     } catch (err) {
       this.running = null;
-      throw err;
+      this.opts.onBusy?.(false);
+      throw new Error((err as NodeJS.ErrnoException).code === "ENOENT" ? "The folder you chose does not exist." : (friendlyFsError(err) ?? (err instanceof Error ? err.message : String(err))));
     }
     this.logFile = exportLogFile(dir, exportId);
     this.log(`start "${project.name}" ${project.width}x${project.height} -> ${size.width}x${size.height} (${height}p), ${project.fps} fps, ${totalFrames} frames`);
@@ -185,7 +206,7 @@ export class ExportService {
     }
     const cancelled = run.cancelled || error === "cancelled";
     let status: ExportRecord["status"] = cancelled ? "cancelled" : error ? "failed" : "done";
-    let message = cancelled ? undefined : error;
+    let message = cancelled || !error ? undefined : describeRenderError(error, job.project);
     let sizeBytes = 0;
     try {
       await run.handle?.sync().catch(() => undefined);
@@ -199,7 +220,7 @@ export class ExportService {
       }
     } catch (err) {
       status = "failed";
-      message = `Could not save the file: ${err instanceof Error ? err.message : String(err)}`;
+      message = `Could not save the file: ${friendlyFsError(err) ?? (err instanceof Error ? err.message : String(err))}`;
       await fs.rm(run.part, {force: true}).catch(() => undefined);
     }
     this.destroyWindow(); // decoder and encoder memory goes back to the OS
@@ -225,6 +246,7 @@ export class ExportService {
     await addExport(ctx.dir, record).catch((err) => console.error("[export] could not write history", err));
     this.running = null;
     this.logFile = null;
+    this.opts.onBusy?.(false);
     this.opts.emit({kind: "finished", exportId: run.exportId, projectId: run.projectId, record});
   }
 

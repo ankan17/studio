@@ -12,7 +12,12 @@ const api: StudioApi = {
   openMedia: () => ipcRenderer.invoke(IPC.openMedia),
   onMetrics: (listener) => on(IPC.metrics, (m: MemoryMetrics) => listener(m)),
   onFlushRequest: (listener) => on(IPC.flushRequest, () => listener()),
-  flushDone: () => ipcRenderer.invoke(IPC.flushDone),
+  flushDone: (result) => ipcRenderer.invoke(IPC.flushDone, result),
+  onShowShortcuts: (listener) => on(IPC.showShortcuts, () => listener()),
+  app: {
+    info: () => ipcRenderer.invoke(IPC.app.info),
+    logError: (message, stack) => ipcRenderer.invoke(IPC.app.logError, {message, stack}),
+  },
   media: {
     import: (projectId) => ipcRenderer.invoke(IPC.media.import, {projectId}),
     importPaths: (projectId, paths) => ipcRenderer.invoke(IPC.media.importPaths, {projectId, paths}),
