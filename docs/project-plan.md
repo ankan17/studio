@@ -268,13 +268,15 @@ Exit, Gate 2: the real user exports a real vlog. Audio is still in sync at the 5
 
 ### M7 Reliability and release
 
-- [ ] Crash recovery flow, missing media and disk-full handling
-- [ ] Performance pass against the budget table
-- [ ] Shortcut sheet, empty states, first-run guidance
-- [ ] DMG, update channel, crash reporting. Code signing and notarisation only if a paid Apple Developer account is approved
-- [ ] Acceptance scenarios from the spec run as a release checklist
+- [x] Crash recovery flow, missing media and disk-full handling
+- [x] Performance pass against the budget table
+- [x] Shortcut sheet, empty states, first-run guidance
+- [x] DMG, update channel, crash reporting. Code signing and notarisation only if a paid Apple Developer account is approved: not approved, so the DMG is unsigned (ad-hoc signature)
+- [x] Acceptance scenarios from the spec run as a release checklist (`docs/release-checklist.md`)
 
 Exit: V1 installed on the user's Mac and used for a published video.
+
+**Status: built and verified on the dev Mac** (`docs/reports/M7.md`). Decided with the user before building: a manual update check (no auto-update, which needs a signed app), local-only crash reporting (log file, local minidumps, a Report a Problem dialog that copies details), unsigned with an ad-hoc signature, and the acceptance scenarios as a checklist with what can be automated automated. Reliability: a force-quit mid-edit is detected on the next start (session lock) and the dashboard offers the project edited last; a failed save is retried every 5 seconds with a banner that says why, and leaving or closing with an unsaved failure asks first; a missing file is named in a banner and in the export error, including one lost mid-export; a full disk is caught before an export starts and explained in plain words on import, save and export (tested on a real 1.5GB disk image). Also: `?` shortcut sheet, first-run steps on an empty project, a log with local crash dumps, the media queue pausing while an export runs, a production CSP without localhost. Still to run by hand on the 8GB Mac with real footage: Gate 2 (5-minute export, sync, the 1.5GB peak), the memory bars, and the checklist's hand column. The exit (installed and used for a published video) is the user's.
 
 ### M8 Business Studio
 

@@ -23,3 +23,6 @@ export function Roundel({kind, className = ""}: {kind: LineKind; className?: str
 
 /** Seconds as m:ss for durations. */
 export const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+
+/** An error that crossed IPC, without Electron's "Error invoking remote method ...: Error:" prefix. */
+export const cleanIpcMessage = (err: unknown): string => (err instanceof Error ? err.message : String(err)).replace(/^Error invoking remote method '[^']+': (Error: )?/, "");

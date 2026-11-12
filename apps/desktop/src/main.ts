@@ -1,10 +1,11 @@
-import {cacheFile, fileExists, findMissing, importAssetFile, ImportError, ProjectStore, removeAssetFiles, sweepOrphanAssets, sweepStaleImports, type ImportedFile} from "@studio/project-store";
+import {beginSession, cacheFile, endSessionSync, fileExists, findMissing, friendlyErrorText, friendlyFsError, importAssetFile, ImportError, ProjectStore, removeAssetFiles, sweepOrphanAssets, sweepStaleImports, type ImportedFile} from "@studio/project-store";
 import {app, BrowserWindow, dialog, ipcMain, session, shell, type IpcMainInvokeEvent} from "electron";
 import fs from "node:fs";
 import path from "node:path";
-import {ExportReq, IPC, MediaReq, Req, type ImportOutcome, type MediaHandle, type ProjectCard} from "./ipc";
+import {ExportReq, FlushReq, IPC, MediaReq, Req, type ImportOutcome, type MediaHandle, type ProjectCard} from "./ipc";
 import type {z} from "zod";
 import {allowMediaRoot, handleMediaProtocol, mediaUrl, registerMediaScheme} from "./media-protocol";
+import {buildMenu, initCrashHandling, initLog, log, RendererError, SessionState} from "./app-health";
 import {ExportService} from "./export-service";
 import {MediaService} from "./media-service";
 import {startMemorySampler} from "./memory-sampler";
@@ -22,8 +23,9 @@ let mainWindow: BrowserWindow | null = null;
 let store: ProjectStore;
 let media: MediaService;
 let exporter: ExportService;
-let flushResolve: (() => void) | null = null;
+let flushResolve: ((r: {ok: boolean; error?: string}) => void) | null = null;
 let closing = false;
+let sessionRoot = "";
 
 // Every handler must call this: the call has to come from the top frame of the editor window.
 function assertTrusted(event: IpcMainInvokeEvent): void {
@@ -69,12 +71,39 @@ function createWindow(): void {
     e.preventDefault();
     closing = true;
     const win = mainWindow;
-    const done = new Promise<void>((resolve) => {
+    const done = new Promise<{ok: boolean; error?: string}>((resolve) => {
       flushResolve = resolve;
       win.webContents.send(IPC.flushRequest);
-      setTimeout(resolve, 3000);
+      setTimeout(() => resolve({ok: true}), 3000);
     });
-    void done.then(() => win.close());
+    void done.then(async (result) => {
+      // A save that failed (a full disk) must not be lost silently: the user decides whether to close anyway.
+      if (!result.ok) {
+        const answer = await dialog.showMessageBox(win, {
+          type: "warning",
+          buttons: ["Keep editing", "Close anyway"],
+          defaultId: 0,
+          cancelId: 0,
+          message: "Your latest changes could not be saved.",
+          detail: `${result.error ?? "The project could not be written to disk."}\n\nIf you close now, work since the last successful save is lost.`,
+        });
+        if (answer.response === 0) {
+          closing = false;
+          return;
+        }
+      }
+      win.close();
+    });
+  });
+  // The editor's own process died: say so, and reopen it. Work is safe up to the last autosave.
+  mainWindow.webContents.on("render-process-gone", (_e, d) => {
+    if (d.reason === "clean-exit" || d.reason === "killed" || closing) return;
+    log("error", `editor window gone: ${d.reason}`);
+    const win = mainWindow;
+    if (!win) return;
+    void dialog
+      .showMessageBox(win, {type: "error", buttons: ["Reopen editor"], message: "The editor stopped unexpectedly.", detail: "Your projects are safe: everything up to the last autosave is kept. Studio will reopen the editor now."})
+      .then(() => win.webContents.reload());
   });
 
   const stop = startMemorySampler((m) => mainWindow?.webContents.send(IPC.metrics, m));
@@ -91,13 +120,36 @@ function createWindow(): void {
 function handle<S extends z.ZodType, R>(channel: string, schema: S | null, fn: (input: z.infer<S>) => Promise<R> | R): void {
   ipcMain.handle(channel, (event, raw: unknown) => {
     assertTrusted(event);
-    return fn(schema ? schema.parse(raw) : (undefined as z.infer<S>));
+    return run(channel, () => fn(schema ? schema.parse(raw) : (undefined as z.infer<S>)));
   });
 }
 
-ipcMain.handle(IPC.flushDone, (event) => {
+// Every failure goes to the log; the ones a user can act on (full disk, read-only disk, permissions) reach the renderer in plain words.
+async function run<R>(channel: string, fn: () => Promise<R> | R): Promise<R> {
+  try {
+    return await fn();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log("error", `${channel}: ${err instanceof Error ? (err.stack ?? message) : message}`);
+    const friendly = friendlyFsError(err) ?? friendlyErrorText(message);
+    throw friendly ? new Error(friendly) : err;
+  }
+}
+
+ipcMain.handle(IPC.flushDone, (event, raw: unknown) => {
   assertTrusted(event);
-  flushResolve?.();
+  flushResolve?.(FlushReq.parse(raw));
+});
+ipcMain.handle(IPC.app.info, (event) => {
+  assertTrusted(event);
+  const previousCrash = SessionState.previousCrash;
+  SessionState.previousCrash = false; // told once: coming back to the dashboard must not show it again
+  return {version: app.getVersion(), previousCrash};
+});
+ipcMain.handle(IPC.app.logError, (event, raw: unknown) => {
+  assertTrusted(event);
+  const e = RendererError.parse(raw);
+  log("error", `renderer: ${e.message}${e.stack ? `\n${e.stack}` : ""}`);
 });
 
 async function toCard(s: Awaited<ReturnType<ProjectStore["list"]>>[number]): Promise<ProjectCard> {
@@ -181,7 +233,8 @@ async function importPaths(projectId: string, paths: string[]): Promise<ImportOu
     } catch (err) {
       // Only expected failures reach the user with their message; anything else is logged and summarised.
       if (!(err instanceof ImportError)) console.error("[import]", err);
-      out.errors.push({name: path.basename(file), message: err instanceof ImportError ? err.message : "Could not copy this file."});
+      const message = err instanceof ImportError ? err.message : (friendlyFsError(err) ?? "Could not copy this file.");
+      out.errors.push({name: path.basename(file), message});
     }
   }
   return out;
@@ -261,8 +314,14 @@ void app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
   // Projects live in the app data folder (override with STUDIO_PROJECTS_DIR for development).
   const root = process.env.STUDIO_PROJECTS_DIR ?? path.join(app.getPath("userData"), "projects");
+  initLog();
+  initCrashHandling();
   store = new ProjectStore(root, {remove: (dir) => shell.trashItem(dir)});
   await store.init();
+  // A lock left by the last session means it did not end cleanly: the dashboard says so once.
+  SessionState.previousCrash = await beginSession(root).catch(() => false);
+  sessionRoot = root;
+  log("info", `start ${app.getVersion()} ${app.isPackaged ? "packaged" : "dev"}${SessionState.previousCrash ? " (last session did not end cleanly)" : ""}`);
   allowMediaRoot(root); // thumbnails, proxies and imported assets are served from project folders
   media = new MediaService({
     projectDir: (id) => store.dir(id),
@@ -275,9 +334,16 @@ void app.whenReady().then(async () => {
       })().catch(() => undefined);
     },
   });
-  exporter = new ExportService({store, emit: (e) => mainWindow?.webContents.send(IPC.exports.event, e), pickSavePath});
+  // The media queue waits while a video renders: two encoders at once is how an 8GB Mac starts to swap.
+  exporter = new ExportService({store, emit: (e) => mainWindow?.webContents.send(IPC.exports.event, e), pickSavePath, onBusy: (busy) => (busy ? media.pause() : media.resume())});
+  buildMenu(() => mainWindow);
   handleMediaProtocol();
   createWindow();
+});
+
+app.on("will-quit", () => {
+  log("info", "quit");
+  endSessionSync(sessionRoot); // only a clean quit removes the lock
 });
 
 app.on("before-quit", () => {

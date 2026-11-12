@@ -24,6 +24,7 @@ export class MediaService {
   private queue: QueueItem[] = [];
   private running: Running | null = null;
   private runEnded: Promise<void> | null = null;
+  private paused = false;
   private busy = false; // set synchronously, so two enqueues can never start two jobs
   private worker: BrowserWindow | null = null;
   private workerReady: Promise<void> | null = null;
@@ -133,8 +134,18 @@ export class MediaService {
     await target;
   }
 
+  /** Stop starting new jobs (the one running finishes); the queue keeps its place. */
+  pause(): void {
+    this.paused = true;
+  }
+
+  resume(): void {
+    this.paused = false;
+    void this.pump();
+  }
+
   private async pump(): Promise<void> {
-    if (this.busy) return;
+    if (this.busy || this.paused) return;
     const item = this.queue.shift();
     if (!item) {
       this.idleTimer = setTimeout(() => this.closeWorker(), IDLE_CLOSE_MS);

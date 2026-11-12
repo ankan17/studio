@@ -1,4 +1,5 @@
-import {useEffect, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
+import {useApp} from "./appStore";
 import {edits, view} from "./edits";
 import {ExportDialog} from "./ExportDialog";
 import {handleExportEvent, useExport} from "./exportStore";
@@ -7,7 +8,7 @@ import {Back, Check, Warning} from "./icons";
 import {Hud} from "./Hud";
 import {Inspector} from "./Inspector";
 import {MediaPanel} from "./MediaPanel";
-import {ensureMedia, handleMediaEvent, useMedia} from "./mediaStore";
+import {ensureMedia, handleMediaEvent, useMedia, usedAssetIds} from "./mediaStore";
 import {playback} from "./playback";
 import {Stage} from "./Stage";
 import {Timeline} from "./Timeline";
@@ -19,7 +20,7 @@ const SAVE: Record<SaveState, {label: string; dot: string | null}> = {
   saved: {label: "Saved", dot: null},
   dirty: {label: "Unsaved changes", dot: "bg-warn"},
   saving: {label: "Saving…", dot: "bg-warn"},
-  error: {label: "Could not save", dot: "bg-danger"},
+  error: {label: "Could not save, retrying", dot: "bg-danger"},
 };
 
 // A slider keeps its arrow keys; every other shortcut still works while it has focus.
@@ -32,6 +33,13 @@ export function Editor() {
   const {project, recovered, saveState, error, dispatch, close, refusal} = useEditor();
   const projectId = project?.id;
   const [selected, setSelected] = useState<string | null>(null);
+  // Files the timeline plays that are no longer on disk (moved, deleted, an unplugged drive).
+  const missingMap = useMedia((s) => s.missing);
+  const missingUsed = useMemo(() => {
+    if (!project) return [];
+    const used = usedAssetIds(project.tracks);
+    return project.assets.filter((a) => used.has(a.id) && missingMap[a.sha256]).map((a) => a.name ?? a.relativePath);
+  }, [project, missingMap]);
 
   // Worker events and the open-time check (queue missing proxies, find missing files) live as long as the project is open.
   useEffect(() => {
@@ -61,7 +69,7 @@ export function Editor() {
   // Keyboard: the same functions the buttons and menus call.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (useExport.getState().open) return; // the export dialog has the keyboard (it handles Escape itself)
+      if (useExport.getState().open || useApp.getState().shortcutsOpen) return; // a dialog has the keyboard (it handles Escape itself)
       // In the project name field, Cmd+Z undoes the rename through the history (the field's own undo fights React).
       // The same for a title's text (any field marked data-history-undo).
       const nameField = e.target instanceof HTMLElement && e.target.matches('input[aria-label="Project name"], [data-history-undo]');
@@ -104,12 +112,20 @@ export function Editor() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Leaving with a save that keeps failing would drop the edits since the last good save: ask first.
+  const leave = async () => {
+    await useEditor.getState().flush();
+    const st = useEditor.getState();
+    if (st.saveState === "error" && !window.confirm(`Your latest changes could not be saved.\n\n${st.error ?? ""}\n\nLeave anyway? Work since the last successful save is lost.`)) return;
+    await close();
+  };
+
   if (!project) return null;
   const save = SAVE[saveState];
   return (
     <div className="flex h-full flex-col">
       <header className="drag flex h-11 shrink-0 items-center gap-3 border-b border-line-soft pr-4" style={{paddingLeft: 84}}>
-        <button className="btn btn-ghost no-drag -ml-1 !px-2" onClick={() => void close()} title="Back to all projects"><Back size={14} /> Projects</button>
+        <button className="btn btn-ghost no-drag -ml-1 !px-2" onClick={() => void leave()} title="Back to all projects"><Back size={14} /> Projects</button>
         <span className="h-4 w-px bg-line" />
         <input
           className="no-drag h-7 min-w-[80px] max-w-[320px] rounded-[6px] [field-sizing:content] border border-transparent bg-transparent px-2 text-[13px] font-semibold outline-none transition-colors duration-150 hover:border-line focus:border-go focus:bg-ground"
@@ -131,10 +147,26 @@ export function Editor() {
           {exporting ? `Exporting ${Math.round(exporting.fraction * 100)}%` : "Export"}
         </button>
       </header>
+      {saveState === "error" && (
+        <div className="mx-2.5 mt-2.5 flex items-center gap-2 rounded-[6px] border border-danger/30 bg-danger/10 px-3 py-2 text-caption text-danger" role="alert" data-testid="save-error">
+          <Warning size={14} />
+          <span className="min-w-0">Your latest changes are not saved yet. {error} Studio tries again every few seconds, so keep this window open.</span>
+        </div>
+      )}
       {recovered && (
         <div className="mx-2.5 mt-2.5 flex items-center gap-2 rounded-[6px] border border-warn/30 bg-warn/10 px-3 py-2 text-caption text-warn" role="status">
           <Warning size={14} />
           This project was restored from a recovery copy because its main file was damaged. Check your latest changes.
+        </div>
+      )}
+      {missingUsed.length > 0 && (
+        <div className="mx-2.5 mt-2.5 flex items-center gap-2 rounded-[6px] border border-warn/30 bg-warn/10 px-3 py-2 text-caption text-warn" role="alert" data-testid="missing-banner">
+          <Warning size={14} />
+          <span className="min-w-0">
+            {missingUsed.length === 1 ? "A file on the timeline can't be found: " : `${missingUsed.length} files on the timeline can't be found: `}
+            <span className="font-medium">{missingUsed.slice(0, 3).join(", ")}{missingUsed.length > 3 ? ` and ${missingUsed.length - 3} more` : ""}</span>.
+            {" "}Open "Missing" in the media panel and relink them. Until then they show as blank and the video can't be exported.
+          </span>
         </div>
       )}
       <main className="flex min-h-0 flex-1 gap-2.5 p-2.5 pb-0">
@@ -153,7 +185,7 @@ export function Editor() {
         {refusal ? (
           <span className="flex items-center gap-1.5 text-warn" role="status" data-testid="refusal"><Warning size={12} /> {refusal}</span>
         ) : (
-          <span className="hidden lg:inline">Space play · S split · ⌫ delete · ⌘Z undo · ⌘= zoom · right-click for more</span>
+          <span className="hidden lg:inline">Space play · S split · ⌫ delete · ⌘Z undo · ⌘= zoom · right-click for more · ? all shortcuts</span>
         )}
       </footer>
     </div>

@@ -1,7 +1,8 @@
 import {FORMAT_PRESETS, FPS_OPTIONS, type Fps} from "@studio/schema";
 import {useCallback, useEffect, useState} from "react";
+import {useApp} from "./appStore";
 import {useEditor} from "./editorStore";
-import {Duplicate, Pencil, Plus, Trash} from "./icons";
+import {Close, Duplicate, Pencil, Plus, Trash, Warning} from "./icons";
 import type {ProjectCard} from "./ipc";
 import {Roundel, clock} from "./ui";
 
@@ -119,6 +120,8 @@ function Card({card, onOpen, onChanged}: {card: ProjectCard; onOpen: () => void;
 
 export function Dashboard() {
   const open = useEditor((s) => s.open);
+  const crashed = useApp((s) => s.previousCrash);
+  const dismissCrash = useApp((s) => s.dismissCrash);
   const [cards, setCards] = useState<ProjectCard[] | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +146,16 @@ export function Dashboard() {
             </div>
             {cards && cards.length > 0 && <button className="btn btn-go !h-9 !px-4" onClick={() => setCreating(true)}><Plus size={14} /> New project</button>}
           </div>
+          {crashed && (
+            <div className="mb-4 flex items-start gap-2 rounded-[6px] border border-warn/30 bg-warn/10 px-3 py-2 text-caption text-warn" role="status" data-testid="crash-notice">
+              <Warning size={14} />
+              <span className="min-w-0 flex-1">
+                Studio did not close properly last time. Your projects are safe: every change up to the last autosave was kept, and a damaged project file is restored from a recovery copy when you open it.
+                {cards && cards[0] && <> <button className="font-medium underline" onClick={() => (dismissCrash(), openProject(cards[0]!.id))}>Open "{cards[0].name}"</button>, the one you edited last.</>}
+              </span>
+              <button className="text-warn/80 hover:text-warn" aria-label="Dismiss" onClick={dismissCrash}><Close size={12} /></button>
+            </div>
+          )}
           {error && <div className="mb-4 rounded-[6px] border border-danger/30 bg-danger/10 px-3 py-2 text-caption text-danger" role="alert">{error}</div>}
           {cards?.length === 0 && (
             <div className="measure grid justify-items-start gap-2 rounded-[8px] border border-dashed border-line px-8 py-10">

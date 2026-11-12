@@ -77,15 +77,15 @@ def make_fixtures(d: Path, small=False):
 
 # ---- app lifecycle
 class App:
-    def __init__(self, projects_dir: Path, workdir: Path, electron_args=()):
-        self.projects_dir, self.workdir, self.electron_args = projects_dir, workdir, list(electron_args)
+    def __init__(self, projects_dir: Path, workdir: Path, electron_args=(), env=None):
+        self.projects_dir, self.workdir, self.electron_args, self.extra_env = projects_dir, workdir, list(electron_args), dict(env or {})
         self.proc = self.pw = self.browser = self.page = None
         self.pick_file = workdir / "pick.json"
         self.save_file = workdir / "save.txt"
         self.keepalive = None
 
     def start(self):
-        env = dict(os.environ, STUDIO_PROJECTS_DIR=str(self.projects_dir), STUDIO_E2E="1", STUDIO_E2E_PICK_FILE=str(self.pick_file), STUDIO_E2E_SAVE_FILE=str(self.save_file))
+        env = dict(os.environ, STUDIO_PROJECTS_DIR=str(self.projects_dir), STUDIO_E2E="1", STUDIO_E2E_PICK_FILE=str(self.pick_file), STUDIO_E2E_SAVE_FILE=str(self.save_file), **self.extra_env)
         self.pick_file.write_text("[]")
         self.save_file.write_text("")
         log = open(self.workdir / "app.log", "w")
@@ -128,6 +128,11 @@ class App:
             self.keepalive.kill()
         sh("pkill", "-f", "Electron.*remote-debugging-port=%d" % PORT)
         time.sleep(1)
+
+    def kill(self):
+        """Force quit: SIGKILL to every Electron process, so nothing gets to save or clean up (a crash, a power cut)."""
+        sh("pkill", "-9", "-f", "Electron.*remote-debugging-port=%d" % PORT)
+        self.stop()
 
     def save_to(self, path):
         """What the export save dialog returns next ("" cancels it). The name main suggested is in save.txt.suggested."""

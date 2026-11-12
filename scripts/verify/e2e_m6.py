@@ -285,7 +285,7 @@ try:
     C.check("No uncaught errors in the page", not page_errors, page_errors[:3])
     log = (work / "app.log").read_text()
     # Refusals this run triggers on purpose, and the render window's last write arriving after a cancel.
-    expected = ("'exports:start': Error: Choose a folder outside", "'exports:start': Error: ENOENT", "'render:write': Error: Export was cancelled.")
+    expected = ("'exports:start': Error: Choose a folder outside", "'exports:start': Error: ENOENT", "'exports:start': Error: The folder you chose does not exist.", "'render:write': Error: Export was cancelled.")
     errs = [l for l in log.splitlines() if "Error" in l and "DevTools" not in l and "ExtensionLoadWarning" not in l and not any(e in l for e in expected)]
     C.check("No errors in the app log", not errs, errs[:3])
 except Exception:
