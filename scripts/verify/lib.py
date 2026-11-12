@@ -81,11 +81,13 @@ class App:
         self.projects_dir, self.workdir = projects_dir, workdir
         self.proc = self.pw = self.browser = self.page = None
         self.pick_file = workdir / "pick.json"
+        self.save_file = workdir / "save.txt"
         self.keepalive = None
 
     def start(self):
-        env = dict(os.environ, STUDIO_PROJECTS_DIR=str(self.projects_dir), STUDIO_E2E="1", STUDIO_E2E_PICK_FILE=str(self.pick_file))
+        env = dict(os.environ, STUDIO_PROJECTS_DIR=str(self.projects_dir), STUDIO_E2E="1", STUDIO_E2E_PICK_FILE=str(self.pick_file), STUDIO_E2E_SAVE_FILE=str(self.save_file))
         self.pick_file.write_text("[]")
+        self.save_file.write_text("")
         log = open(self.workdir / "app.log", "w")
         # forge exits when stdin closes, so hand it a stdin that stays open
         self.keepalive = subprocess.Popen(["sleep", "3000"], stdout=subprocess.PIPE)
@@ -99,7 +101,7 @@ class App:
                 self.browser = self.pw.chromium.connect_over_cdp(f"http://127.0.0.1:{PORT}")
                 for ctx in self.browser.contexts:
                     for p in ctx.pages:
-                        if "localhost:5173" in p.url and "worker=media" not in p.url:
+                        if "localhost:5173" in p.url and "worker=" not in p.url:
                             self.page = p
                 if self.page:
                     self.page.wait_for_selector("text=Projects", timeout=60000)
@@ -126,6 +128,10 @@ class App:
             self.keepalive.kill()
         sh("pkill", "-f", "Electron.*remote-debugging-port=%d" % PORT)
         time.sleep(1)
+
+    def save_to(self, path):
+        """What the export save dialog returns next ("" cancels it). The name main suggested is in save.txt.suggested."""
+        self.save_file.write_text(str(path))
 
     def pick(self, paths):
         self.pick_file.write_text(json.dumps([str(p) for p in paths]))

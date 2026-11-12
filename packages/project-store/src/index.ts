@@ -13,6 +13,7 @@ import {writeFileAtomic} from "./atomic";
 
 export {writeFileAtomic};
 export * from "./assets";
+export * from "./exports";
 
 export type ProjectSummary = {
   id: string;

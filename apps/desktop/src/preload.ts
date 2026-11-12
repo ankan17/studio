@@ -1,5 +1,5 @@
 import {contextBridge, ipcRenderer, webUtils} from "electron";
-import {IPC, type MediaEvent, type MemoryMetrics, type StudioApi} from "./ipc";
+import {IPC, type ExportEvent, type MediaEvent, type MemoryMetrics, type StudioApi} from "./ipc";
 
 const on = (channel: string, listener: (...args: never[]) => void) => {
   const handler = (_e: Electron.IpcRendererEvent, ...args: unknown[]) => (listener as (...a: unknown[]) => void)(...args);
@@ -23,6 +23,12 @@ const api: StudioApi = {
     deleteAssets: (projectId, items) => ipcRenderer.invoke(IPC.media.deleteAssets, {projectId, items}),
     onEvent: (listener) => on(IPC.media.event, (e: MediaEvent) => listener(e)),
     pathOf: (file) => webUtils.getPathForFile(file),
+  },
+  exports: {
+    start: (projectId, height) => ipcRenderer.invoke(IPC.exports.start, {projectId, height}),
+    cancel: (exportId) => ipcRenderer.invoke(IPC.exports.cancel, {exportId}),
+    list: (projectId) => ipcRenderer.invoke(IPC.exports.list, {projectId}),
+    onEvent: (listener) => on(IPC.exports.event, (e: ExportEvent) => listener(e)),
   },
   projects: {
     list: () => ipcRenderer.invoke(IPC.projects.list),

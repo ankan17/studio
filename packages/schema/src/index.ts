@@ -11,6 +11,7 @@ export * from "./migrate";
 export * from "./fps";
 export * from "./text";
 export * from "./transition";
+export * from "./export";
 
 export const SCHEMA_VERSION = 1;
 export const FPS_OPTIONS = [24, 25, 30, 60] as const;

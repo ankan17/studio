@@ -38,7 +38,7 @@ export function proxyFps(sourceFps: number | undefined): number {
 }
 
 // Joins neighbouring writes so IPC carries a few large chunks, not thousands of small ones.
-function coalescingWritable(write: (position: number, data: Uint8Array) => Promise<void>) {
+export function coalescingWritable(write: (position: number, data: Uint8Array) => Promise<void>) {
   let start = 0;
   let parts: Uint8Array[] = [];
   let size = 0;

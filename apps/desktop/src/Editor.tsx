@@ -1,5 +1,7 @@
 import {useEffect, useState} from "react";
 import {edits, view} from "./edits";
+import {ExportDialog} from "./ExportDialog";
+import {handleExportEvent, useExport} from "./exportStore";
 import {useEditor, type SaveState} from "./editorStore";
 import {Back, Check, Warning} from "./icons";
 import {Hud} from "./Hud";
@@ -26,6 +28,7 @@ const isTyping = (t: EventTarget | null, key: string) =>
   (t.isContentEditable || ["TEXTAREA", "SELECT"].includes(t.tagName) || (t instanceof HTMLInputElement && (t.type !== "range" || key.startsWith("Arrow") || key === "Home" || key === "End")));
 
 export function Editor() {
+  const exporting = useExport((s) => s.running);
   const {project, recovered, saveState, error, dispatch, close, refusal} = useEditor();
   const projectId = project?.id;
   const [selected, setSelected] = useState<string | null>(null);
@@ -38,9 +41,12 @@ export function Editor() {
     view.reset();
     clearTimelineMedia();
     const off = window.studio.media.onEvent(handleMediaEvent);
+    useExport.getState().reset();
+    const offExport = window.studio.exports.onEvent(handleExportEvent);
     void ensureMedia(projectId, useEditor.getState().project?.assets ?? []);
     return () => {
       off();
+      offExport();
       void window.studio.media.cancel(projectId); // leaving the project stops its queue; reopening resumes it
     };
   }, [projectId]);
@@ -55,6 +61,7 @@ export function Editor() {
   // Keyboard: the same functions the buttons and menus call.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (useExport.getState().open) return; // the export dialog has the keyboard (it handles Escape itself)
       // In the project name field, Cmd+Z undoes the rename through the history (the field's own undo fights React).
       // The same for a title's text (any field marked data-history-undo).
       const nameField = e.target instanceof HTMLElement && e.target.matches('input[aria-label="Project name"], [data-history-undo]');
@@ -120,6 +127,9 @@ export function Editor() {
           Background
           <input type="color" className="h-5 w-5 cursor-pointer appearance-none rounded-full border border-line bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-0" value={project.backgroundColor} onChange={(e) => dispatch({type: "setProject", patch: {backgroundColor: e.target.value}}, {coalesce: "background", label: "Background colour"})} />
         </label>
+        <button className={`btn no-drag ${exporting ? "btn-ghost" : "btn-go"}`} onClick={() => useExport.getState().setOpen(true)} disabled={!project.tracks.some((t) => t.clips.length)} data-testid="export-open" title="Export an MP4">
+          {exporting ? `Exporting ${Math.round(exporting.fraction * 100)}%` : "Export"}
+        </button>
       </header>
       {recovered && (
         <div className="mx-2.5 mt-2.5 flex items-center gap-2 rounded-[6px] border border-warn/30 bg-warn/10 px-3 py-2 text-caption text-warn" role="status">
@@ -136,6 +146,7 @@ export function Editor() {
         <Inspector />
       </main>
       <div className="p-2.5"><Timeline /></div>
+      <ExportDialog />
       <footer className="flex h-6 shrink-0 items-center gap-4 border-t border-line-soft px-4 text-[11px] text-ink-3">
         <Hud />
         <span className="flex-1" />

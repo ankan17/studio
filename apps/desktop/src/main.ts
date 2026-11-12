@@ -2,9 +2,10 @@ import {cacheFile, fileExists, findMissing, importAssetFile, ImportError, Projec
 import {app, BrowserWindow, dialog, ipcMain, session, shell, type IpcMainInvokeEvent} from "electron";
 import fs from "node:fs";
 import path from "node:path";
-import {IPC, MediaReq, Req, type ImportOutcome, type MediaHandle, type ProjectCard} from "./ipc";
+import {ExportReq, IPC, MediaReq, Req, type ImportOutcome, type MediaHandle, type ProjectCard} from "./ipc";
 import type {z} from "zod";
 import {allowMediaRoot, handleMediaProtocol, mediaUrl, registerMediaScheme} from "./media-protocol";
+import {ExportService} from "./export-service";
 import {MediaService} from "./media-service";
 import {startMemorySampler} from "./memory-sampler";
 
@@ -20,6 +21,7 @@ const E2E_ARGS = process.env.STUDIO_E2E === "1" && !app.isPackaged ? ["--studio-
 let mainWindow: BrowserWindow | null = null;
 let store: ProjectStore;
 let media: MediaService;
+let exporter: ExportService;
 let flushResolve: (() => void) | null = null;
 let closing = false;
 
@@ -81,6 +83,7 @@ function createWindow(): void {
     mainWindow = null;
     // The hidden worker is a window too: leaving it open would stop "window-all-closed" and the dock re-open check.
     media?.shutdown();
+    exporter?.shutdown();
   });
 }
 
@@ -139,6 +142,23 @@ async function pickFiles(options: Electron.OpenDialogOptions): Promise<string[]>
   if (E2E && stub) return JSON.parse(await fs.promises.readFile(stub, "utf8")) as string[];
   const result = await dialog.showOpenDialog(mainWindow!, options);
   return result.canceled ? [] : result.filePaths;
+}
+
+// Same idea for the export save dialog: STUDIO_E2E_SAVE_FILE names a text file holding the path the dialog would
+// return (empty means the dialog was cancelled). The suggested file name is written next to it, for the test to read.
+async function pickSavePath(suggestedName: string): Promise<string | null> {
+  const stub = process.env.STUDIO_E2E_SAVE_FILE;
+  if (E2E && stub) {
+    await fs.promises.writeFile(`${stub}.suggested`, suggestedName);
+    return (await fs.promises.readFile(stub, "utf8")).trim() || null;
+  }
+  const result = await dialog.showSaveDialog(mainWindow!, {
+    title: "Export video",
+    defaultPath: path.join(app.getPath("videos"), suggestedName),
+    filters: [{name: "MP4 video", extensions: ["mp4"]}],
+    properties: ["createDirectory", "showOverwriteConfirmation"],
+  });
+  return result.canceled || !result.filePath ? null : result.filePath;
 }
 
 const MEDIA_FILTER = [{name: "Media", extensions: ["mp4", "mov", "m4v", "mp3", "m4a", "wav", "jpg", "jpeg", "png"]}];
@@ -219,6 +239,11 @@ handle(IPC.media.deleteAssets, MediaReq.remove, async ({projectId, items}) => {
   }
 });
 
+// ---- export (M6)
+handle(IPC.exports.start, ExportReq.start, ({projectId, height}) => exporter.start(projectId, height));
+handle(IPC.exports.cancel, ExportReq.cancel, ({exportId}) => exporter.cancel(exportId));
+handle(IPC.exports.list, ExportReq.list, ({projectId}) => exporter.list(projectId));
+
 ipcMain.handle(IPC.openMedia, async (event): Promise<MediaHandle | null> => {
   assertTrusted(event);
   const result = await dialog.showOpenDialog(mainWindow!, {
@@ -250,11 +275,15 @@ void app.whenReady().then(async () => {
       })().catch(() => undefined);
     },
   });
+  exporter = new ExportService({store, emit: (e) => mainWindow?.webContents.send(IPC.exports.event, e), pickSavePath});
   handleMediaProtocol();
   createWindow();
 });
 
-app.on("before-quit", () => media?.shutdown());
+app.on("before-quit", () => {
+  media?.shutdown();
+  exporter?.shutdown();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

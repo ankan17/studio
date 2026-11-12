@@ -1,6 +1,6 @@
 // Shared by main, preload and renderer. Channel names, Zod schemas for every request (main validates all
 // arguments, the renderer is never trusted) and the typed API exposed as window.studio.
-import {FPS_OPTIONS, ProjectSchema, type Fps, type Project} from "@studio/schema";
+import {EXPORT_HEIGHTS, FPS_OPTIONS, ProjectSchema, type ExportHeight, type ExportRecord, type Fps, type Project} from "@studio/schema";
 import {z} from "zod";
 
 export const IPC = {
@@ -27,6 +27,20 @@ export const IPC = {
     writeAt: "worker:write-at",
     commit: "worker:commit",
     done: "worker:done",
+  },
+  exports: {
+    start: "exports:start",
+    cancel: "exports:cancel",
+    list: "exports:list",
+    event: "exports:event", // main -> renderer
+  },
+  render: {
+    ready: "render:ready",
+    job: "render:job", // main -> render window
+    cancel: "render:cancel",
+    progress: "render:progress",
+    write: "render:write",
+    done: "render:done",
   },
   projects: {
     list: "projects:list",
@@ -103,6 +117,39 @@ export const WorkerReq = {
   done: z.object({jobId, error: z.string().max(2000).optional()}),
 } as const;
 
+// Export. The renderer only says which project and which size; main picks the destination in a save dialog and reads the
+// project from disk, so no path and no project snapshot comes from the renderer.
+const exportHeight = z.union(EXPORT_HEIGHTS.map((h) => z.literal(h)) as [z.ZodLiteral<1080>, z.ZodLiteral<720>]);
+export const ExportReq = {
+  start: z.object({projectId: id, height: exportHeight}),
+  cancel: z.object({exportId: id}),
+  list: z.object({projectId: id}),
+} as const;
+
+// Messages from the hidden render window. Accepted only for the export that is running.
+export const RenderReq = {
+  progress: z.object({jobId, fraction: z.number().min(0).max(1)}),
+  write: z.object({jobId, position: z.number().int().nonnegative().max(32 * 1024 ** 3), data: z.instanceof(Uint8Array).refine((b) => b.byteLength <= MAX_WRITE, "Write too large")}),
+  done: z.object({jobId, error: z.string().max(2000).optional()}),
+} as const;
+
+export type RenderJob = {
+  jobId: string;
+  /** Read from the project folder by main (validated), not sent by the renderer. */
+  project: Project;
+  /** media:// URL of the project folder; the export plays the original files beneath it. */
+  baseUrl: string;
+  totalFrames: number;
+  /** Output size; `scale` is applied to the project's own size. */
+  width: number;
+  height: number;
+  scale: number;
+};
+
+export type ExportEvent =
+  | {kind: "progress"; exportId: string; projectId: string; fraction: number; elapsedMs: number; etaMs: number | null}
+  | {kind: "finished"; exportId: string; projectId: string; record: ExportRecord};
+
 export type WorkerJob = {
   jobId: string;
   sha256: string;
@@ -147,6 +194,8 @@ export type ProjectCard = {
 /** `baseUrl` is the media:// URL of the project folder; assets, proxies and thumbnails are served beneath it. */
 export type OpenedProject = {project: Project; recovered: boolean; baseUrl: string};
 
+export type ExportStart = {exportId: string; fileName: string};
+
 export type MediaHandle = {name: string; url: string; sizeMB: number};
 export type MemoryMetrics = {totalMB: number; swapMB: number; byProcess: Record<string, number>};
 
@@ -174,6 +223,13 @@ export type StudioApi = {
     onEvent: (listener: (e: MediaEvent) => void) => () => void;
     /** Path of a dropped File (the renderer has no access to paths otherwise). */
     pathOf: (file: File) => string;
+  };
+  exports: {
+    /** Save dialog in main (suggested name "<project> v<n>.mp4"), then the export runs; progress and the result arrive as events. Null if the dialog was cancelled. Save the project first. */
+    start: (projectId: string, height: ExportHeight) => Promise<ExportStart | null>;
+    cancel: (exportId: string) => Promise<void>;
+    list: (projectId: string) => Promise<ExportRecord[]>;
+    onEvent: (listener: (e: ExportEvent) => void) => () => void;
   };
   projects: {
     list: () => Promise<ProjectCard[]>;
