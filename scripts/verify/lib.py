@@ -77,8 +77,8 @@ def make_fixtures(d: Path, small=False):
 
 # ---- app lifecycle
 class App:
-    def __init__(self, projects_dir: Path, workdir: Path):
-        self.projects_dir, self.workdir = projects_dir, workdir
+    def __init__(self, projects_dir: Path, workdir: Path, electron_args=()):
+        self.projects_dir, self.workdir, self.electron_args = projects_dir, workdir, list(electron_args)
         self.proc = self.pw = self.browser = self.page = None
         self.pick_file = workdir / "pick.json"
         self.save_file = workdir / "save.txt"
@@ -91,7 +91,7 @@ class App:
         log = open(self.workdir / "app.log", "w")
         # forge exits when stdin closes, so hand it a stdin that stays open
         self.keepalive = subprocess.Popen(["sleep", "3000"], stdout=subprocess.PIPE)
-        self.proc = subprocess.Popen(["npx", "electron-forge", "start", "--", f"--remote-debugging-port={PORT}"], cwd=DESKTOP, env=env,
+        self.proc = subprocess.Popen(["npx", "electron-forge", "start", "--", f"--remote-debugging-port={PORT}", *self.electron_args], cwd=DESKTOP, env=env,
                                      stdin=self.keepalive.stdout, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         from playwright.sync_api import sync_playwright
         self.pw = sync_playwright().start()

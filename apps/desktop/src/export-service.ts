@@ -2,8 +2,8 @@
 // renderer. The renderer process only says which project and which size: main reads the project from disk, asks for
 // the destination in a native save dialog, writes the chunks the render window sends to `<file>.part`, and renames it
 // into place only when the render succeeded. The window is destroyed after every export, whatever the outcome.
-import {addExport, exportLogFile, fileExists, nextExportVersion, readExports, type ProjectStore} from "@studio/project-store";
-import {exportFileName, exportSize, projectDurationFrames, type ExportHeight, type ExportRecord} from "@studio/schema";
+import {addExport, exportLogFile, fileExists, readExports, type ProjectStore} from "@studio/project-store";
+import {exportFileName, exportSize, nextExportVersion, projectDurationFrames, type ExportHeight, type ExportRecord} from "@studio/schema";
 import {BrowserWindow, ipcMain, type IpcMainInvokeEvent} from "electron";
 import {randomUUID} from "node:crypto";
 import fsSync from "node:fs";

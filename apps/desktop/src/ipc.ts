@@ -140,9 +140,10 @@ export type RenderJob = {
   /** media:// URL of the project folder; the export plays the original files beneath it. */
   baseUrl: string;
   totalFrames: number;
-  /** Output size; `scale` is applied to the project's own size. */
+  /** Output width; `scale` is applied to the project's own size. */
   width: number;
-  height: number;
+  /** The export size chosen in the dialog (the short side), which picks the bitrate. */
+  height: ExportHeight;
   scale: number;
 };
 

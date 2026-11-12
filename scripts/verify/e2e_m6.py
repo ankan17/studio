@@ -4,7 +4,7 @@ cancel (no file kept), refused destinations, the MP4 itself (size, fps, codecs, 
 five golden frames against the preview, export history and per-export logs in the project folder, and that the render
 window's memory is returned afterwards. The 5-minute exit (Gate 2) is run by hand on real footage: see M6.notes.md.
 Usage: python3 e2e_m6.py <results.json> [--small]"""
-import json, subprocess, sys, tempfile, time
+import json, shutil, subprocess, sys, tempfile, time
 from pathlib import Path
 from lib import App, Checks, MemorySampler, REPO, ffprobe, make_fixtures, sh
 
@@ -13,7 +13,9 @@ small = "--small" in sys.argv
 C = Checks("M6")
 work = Path(tempfile.mkdtemp(prefix="studio-m6-"))
 fx = make_fixtures(work / "fixtures", small=small)
-app = App(work / "projects", work)
+# Screenshots are taken in the display's colour space on macOS (a P3 screen desaturates them), while ffmpeg reads the
+# export as sRGB. Forcing sRGB makes the golden-frame comparison like for like.
+app = App(work / "projects", work, electron_args=["--force-color-profile=srgb"])
 shots = REPO / "docs" / "reports" / "assets"
 shots.mkdir(parents=True, exist_ok=True)
 outdir = work / "out"
@@ -81,7 +83,10 @@ try:
         page.keyboard.press("Escape")
         page.mouse.move(1430, 890)
         page.wait_for_timeout(150)
-        return raw_frame(page.locator("[data-testid=preview]").screenshot())
+        png = page.locator("[data-testid=preview]").screenshot()
+        preview_frame.n = getattr(preview_frame, "n", 0) + 1
+        (work / f"golden-preview-{preview_frame.n}.png").write_bytes(png)
+        return raw_frame(png)
 
     def tab_count():
         mem.sample()
@@ -95,7 +100,7 @@ try:
         page.keyboard.press("Escape")
         page.wait_for_selector("[role=dialog][aria-labelledby=export-title]", state="detached")
 
-    def export_once(dest, height_label, cancel_when_running=False, timeout=240):
+    def export_once(dest, height_label, cancel_when_running=False, when_running=None, timeout=240):
         """Start an export from the open dialog. Returns 'done', 'cancelled', 'failed' or 'error' (could not start), plus samples."""
         app.save_to(dest)
         page.click(f"[aria-label=Size] button:has-text('{height_label}')")
@@ -109,11 +114,15 @@ try:
                 if page.locator(f"[data-testid=export-{k}]").count():
                     return k, percents, etas
             if page.locator("[data-testid=export-running]").count():
-                if cancel_when_running:
-                    page.click("button:has-text('Cancel export')")
-                    cancel_when_running = False
                 try:
                     percents.append(int(page.inner_text("[data-testid=export-percent]").strip("%")))
+                    # cancel a render that is under way, not one that has not reached the render window yet
+                    if cancel_when_running and percents[-1] > 0:
+                        page.click("button:has-text('Cancel export')")
+                        cancel_when_running = False
+                    if when_running and percents[-1] > 0:
+                        when_running()
+                        when_running = None
                     etas.append(page.inner_text("[data-testid=export-running] .num.text-caption"))
                 except Exception:
                     pass
@@ -142,6 +151,12 @@ try:
     tile.get_by_label("Add to timeline").click()
     dispatch({"type": "setProject", "patch": {"name": "Trip: day/1"}})
     v1 = [c["id"] for c in proj()["tracks"][0]["clips"]]
+    # a dissolve needs footage past the cut on both sides (as in M5): trim 20 frames each side, then close the gap
+    dispatch({"type": "trimClip", "clipId": v1[0], "edge": "end", "deltaFrames": -20})
+    dispatch({"type": "trimClip", "clipId": v1[1], "edge": "start", "deltaFrames": 20})
+    clips = {c["id"]: c for c in proj()["tracks"][0]["clips"]}
+    gap = clips[v1[1]]["startFrame"] - (clips[v1[0]]["startFrame"] + clips[v1[0]]["durationInFrames"])
+    dispatch({"type": "moveClips", "clipIds": v1[1:], "deltaFrames": -gap})
     dispatch({"type": "setTransition", "clipId": v1[0], "transition": {"kind": "fade", "durationInFrames": 20}})
     page.mouse.click(700, 20)
     page.keyboard.press("Home")
@@ -150,7 +165,7 @@ try:
     p = proj()
     total = max(c["startFrame"] + c["durationInFrames"] for t in p["tracks"] for c in t["clips"])
     fps = p["fps"]
-    C.check("The vlog has a transition, a Bengali title and music", any(c.get("transitionOut") for c in p["tracks"][0]["clips"]) and any(t["type"] == "text" and t["clips"] for t in p["tracks"]) and any(t["type"] == "audio" and t["clips"] for t in p["tracks"]), f"{total} frames")
+    C.check("The vlog has a transition, a Bengali title and music", any(c.get("transitionOut") for t in p["tracks"] if t["type"] == "video" for c in t["clips"]) and any(t["type"] == "text" and t["clips"] for t in p["tracks"]) and any(t["type"] == "audio" and t["clips"] for t in p["tracks"]), f"{total} frames")
     pid = p["id"]
     pdir = work / "projects" / pid
 
@@ -214,6 +229,7 @@ try:
         goto(f)
         prev = preview_frame()
         exp = list(subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{f / fps:.4f}", "-i", str(dest), "-frames:v", "1", "-vf", "scale=160:90", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"], capture_output=True).stdout)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{f / fps:.4f}", "-i", str(dest), "-frames:v", "1", str(work / f"golden-export-{f}.png")])
         diffs.append(round(diff(prev, exp), 2) if len(prev) == len(exp) > 0 else 999)
     C.check("Golden frames: the export matches the preview at five frames (mean difference under 12 of 255)", all(d < 12 for d in diffs), diffs)
     C.metrics["golden_frame_diffs"] = diffs
@@ -229,6 +245,32 @@ try:
     close_dialog()
     C.check("Exporting did not change the project file (history is kept apart)", json.loads((pdir / "project.json").read_text()) == proj() and "exports" not in json.loads((pdir / "project.json").read_text()))
 
+    # ---- the full-size export (the plan's budget is about 1080p)
+    open_dialog()
+    dest1080 = outdir / "Trip day 1 v3.mp4"
+    t0 = time.time()
+    res, _, _ = export_once(dest1080, "1080p")
+    took = time.time() - t0
+    v = next((s for s in ffprobe(dest1080).get("streams", []) if s["codec_type"] == "video"), {}) if dest1080.exists() else {}
+    C.check("A 1080p export finishes at 1920x1080 as version 3", res == "done" and (v.get("width"), v.get("height")) == (1920, 1080) and (work / "save.txt.suggested").read_text() == "Trip day 1 v3.mp4", f"{res}, {v.get('width')}x{v.get('height')}, {took:.1f}s")
+    C.metrics["export_1080p"] = {"seconds": round(took, 1), "realtime_factor": round(took / want, 2), "mb": round(dest1080.stat().st_size / 1e6, 1) if dest1080.exists() else 0}
+
+    # ---- a source file that disappears mid-render: a readable failure, no file kept, recorded in history and the log
+    last = next(c for t in proj()["tracks"] if t["type"] == "video" for c in t["clips"] if c["startFrame"] == max(c2["startFrame"] for t2 in proj()["tracks"] if t2["type"] == "video" for c2 in t2["clips"]))
+    asset_file = pdir / next(a["relativePath"] for a in proj()["assets"] if a["id"] == last["assetId"])
+    backup = work / "asset-backup"
+    shutil.copyfile(asset_file, backup)
+    dest_fail = outdir / "Trip day 1 v4.mp4"
+    res, _, _ = export_once(dest_fail, "1080p", when_running=lambda: asset_file.unlink())
+    msg = page.inner_text("[data-testid=export-failed]") if res == "failed" else ""
+    hist = json.loads((pdir / "exports.json").read_text())
+    flog = pdir / "exports" / f"{hist[-1]['id']}.log"
+    C.check("A source file that vanishes mid-render fails the export with a readable error", res == "failed" and "did not finish" in msg, f"{res}: {msg[:300]}")
+    C.check("A failed export keeps no file (not even a partial one)", not dest_fail.exists() and not Path(str(dest_fail) + ".part").exists(), sorted(p.name for p in outdir.iterdir()))
+    C.check("The failed export is in history and its log, with the error", hist[-1]["status"] == "failed" and hist[-1].get("error") and flog.exists() and "failed" in flog.read_text(), {"status": hist[-1]["status"], "error": (hist[-1].get("error") or "")[:200]})
+    shutil.copyfile(backup, asset_file)  # put it back for the rest of the run
+    close_dialog()
+
     # ---- memory
     peak = mem.summary()
     C.metrics["memory"] = peak
@@ -242,7 +284,9 @@ try:
     # ---- end of run
     C.check("No uncaught errors in the page", not page_errors, page_errors[:3])
     log = (work / "app.log").read_text()
-    errs = [l for l in log.splitlines() if "Error" in l and "DevTools" not in l and "ExtensionLoadWarning" not in l]
+    # Refusals this run triggers on purpose, and the render window's last write arriving after a cancel.
+    expected = ("'exports:start': Error: Choose a folder outside", "'exports:start': Error: ENOENT", "'render:write': Error: Export was cancelled.")
+    errs = [l for l in log.splitlines() if "Error" in l and "DevTools" not in l and "ExtensionLoadWarning" not in l and not any(e in l for e in expected)]
     C.check("No errors in the app log", not errs, errs[:3])
 except Exception:
     import traceback

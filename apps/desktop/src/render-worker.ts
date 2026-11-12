@@ -46,13 +46,16 @@ async function runJob(job: RenderJob, signal: AbortSignal): Promise<void> {
     videoBitrate: EXPORT_BITRATE[job.height],
     outputWritable: writable,
     signal,
+    // Remotion's Free License (https://remotion.dev/license). The library still tries its usage ping to remotion.pro;
+    // the CSP's connect-src blocks it, so nothing leaves the machine.
+    licenseKey: "free-license",
     onProgress: ({encodedFrames}: {encodedFrames: number}) => {
       const now = Date.now();
       if (now - last < PROGRESS_EVERY_MS) return;
       last = now;
       void api.progress(job.jobId, Math.min(1, encodedFrames / Math.max(1, job.totalFrames)));
     },
-  } as Parameters<typeof renderMediaOnWeb>[0]);
+  });
 }
 
 export function startRenderWindow(): void {

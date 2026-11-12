@@ -255,14 +255,16 @@ Exit: a complete vlog with music, titles and transitions, no external tool.
 
 ### M6 Export
 
-- [ ] Hidden render window running `renderMediaOnWeb()` on a validated snapshot, output streamed to disk through IPC
-- [ ] Export dialog: 1080p or 720p, fps, destination, versioned filenames
-- [ ] Progress, estimated time, cancel, error surface, log file per export
-- [ ] Export history in the project folder
-- [ ] Golden-frame test comparing a preview still with the export at five frames
-- [ ] Conditional on spike 3: `@remotion/renderer` fallback at concurrency 1
+- [x] Hidden render window running `renderMediaOnWeb()` on a validated snapshot, output streamed to disk through IPC
+- [x] Export dialog: 1080p or 720p, fps, destination, versioned filenames. Export runs at the project's frame rate; there is no fps picker
+- [x] Progress, estimated time, cancel, error surface, log file per export
+- [x] Export history in the project folder
+- [x] Golden-frame test comparing a preview still with the export at five frames
+- [x] Conditional on spike 3: `@remotion/renderer` fallback at concurrency 1. Not needed: spike 3 passed, so none was built
 
 Exit, Gate 2: the real user exports a real vlog. Audio is still in sync at the 5-minute mark.
+
+**Status: built and verified.** 34 of 34 checks pass (`docs/reports/M6.md`): a vlog with a dissolve, a Bengali title and music exported from the real app at 720p and 1080p, H.264 and AAC at the project's frame rate, matching the preview at five golden frames (mean difference 4.6 to 5.7 of 255); cancel and a mid-render failure keep no file; history in `exports.json` and a log per export. Export history is kept out of `project.json`, so schema v1 is unchanged. On the dev Mac a 16.7-second vlog exports in about 4 seconds and total memory peaks around 1.08GB. Still to run, as Gate 2 on the 8GB Mac with real footage: the 5-minute export, sync at the 5-minute mark and the 1.5GB peak.
 
 ### M7 Reliability and release
 
