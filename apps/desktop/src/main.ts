@@ -24,7 +24,7 @@ let store: ProjectStore;
 let media: MediaService;
 let exporter: ExportService;
 let flushResolve: ((r: {ok: boolean; error?: string}) => void) | null = null;
-let closing = false;
+let closeState: "idle" | "asking" | "go" = "idle";
 let sessionRoot = "";
 
 // Every handler must call this: the call has to come from the top frame of the editor window.
@@ -67,14 +67,15 @@ function createWindow(): void {
 
   // Ask the renderer to save pending edits before the window closes (it has 3s to answer).
   mainWindow.on("close", (e) => {
-    if (closing || !mainWindow) return;
+    if (closeState === "go" || !mainWindow) return;
     e.preventDefault();
-    closing = true;
+    if (closeState === "asking") return; // a second Cmd+Q while the save check or its dialog is open
+    closeState = "asking";
     const win = mainWindow;
     const done = new Promise<{ok: boolean; error?: string}>((resolve) => {
       flushResolve = resolve;
       win.webContents.send(IPC.flushRequest);
-      setTimeout(() => resolve({ok: true}), 3000);
+      setTimeout(() => resolve({ok: false, error: "Studio could not confirm that the project was saved."}), 3000);
     });
     void done.then(async (result) => {
       // A save that failed (a full disk) must not be lost silently: the user decides whether to close anyway.
@@ -88,16 +89,17 @@ function createWindow(): void {
           detail: `${result.error ?? "The project could not be written to disk."}\n\nIf you close now, work since the last successful save is lost.`,
         });
         if (answer.response === 0) {
-          closing = false;
+          closeState = "idle";
           return;
         }
       }
+      closeState = "go";
       win.close();
     });
   });
   // The editor's own process died: say so, and reopen it. Work is safe up to the last autosave.
   mainWindow.webContents.on("render-process-gone", (_e, d) => {
-    if (d.reason === "clean-exit" || d.reason === "killed" || closing) return;
+    if (d.reason === "clean-exit" || d.reason === "killed" || closeState === "go") return;
     log("error", `editor window gone: ${d.reason}`);
     const win = mainWindow;
     if (!win) return;
@@ -110,6 +112,7 @@ function createWindow(): void {
   mainWindow.on("closed", () => {
     stop();
     mainWindow = null;
+    closeState = "idle"; // a window reopened from the Dock must flush again
     // The hidden worker is a window too: leaving it open would stop "window-all-closed" and the dock re-open check.
     media?.shutdown();
     exporter?.shutdown();
@@ -343,12 +346,10 @@ void app.whenReady().then(async () => {
 
 app.on("will-quit", () => {
   log("info", "quit");
-  endSessionSync(sessionRoot); // only a clean quit removes the lock
-});
-
-app.on("before-quit", () => {
+  // Only now: a "Keep editing" answer cancels the quit before this point, and must not have stopped an export.
   media?.shutdown();
   exporter?.shutdown();
+  endSessionSync(sessionRoot); // only a clean quit removes the lock
 });
 
 app.on("window-all-closed", () => {

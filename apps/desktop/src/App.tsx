@@ -22,7 +22,7 @@ export function App() {
             .flush()
             .then(() => {
               const {saveState, error} = useEditor.getState();
-              return saveState === "saved" ? {ok: true} : {ok: false, error: error ?? undefined};
+              return saveState === "error" ? {ok: false, error: error ?? undefined} : {ok: true};
             })
             .then((r) => window.studio.flushDone(r)),
       ),

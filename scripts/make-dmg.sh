@@ -1,6 +1,6 @@
 #!/bin/bash
 # Builds the V1 disk image from the packaged app: pnpm --filter @studio/desktop package, then this script.
-# Unsigned and not notarised: the first launch is right-click, Open (see docs/release-checklist.md).
+# Unsigned and not notarised: the first launch goes through System Settings, Privacy & Security, Open Anyway (see docs/release-checklist.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 APP="apps/desktop/out/Studio-darwin-$(uname -m | sed 's/x86_64/x64/')/Studio.app"

@@ -154,9 +154,11 @@ try:
     page.keyboard.press("?")
     C.check("? opens the sheet in the editor too, and Space then does not play", page.locator("[data-testid=shortcut-sheet]").count() == 1)
     page.keyboard.press("Space")
+    page.wait_for_timeout(700)
+    C.check("Space with the sheet open does not play", page.inner_text("[data-testid=playhead]").strip() == "00:00:00")
     page.keyboard.press("Escape")
     page.mouse.click(700, 20)
-    C.check("Typing ? in a text field types it instead", (page.fill("input[aria-label='Project name']", "x"), page.keyboard.type("?"), page.locator("[data-testid=shortcut-sheet]").count() == 0)[2])
+    C.check("Typing ? in a text field types it instead", (page.fill("input[aria-label='Project name']", "x"), page.keyboard.type("?"), page.locator("[data-testid=shortcut-sheet]").count() == 0 and page.input_value("input[aria-label='Project name']") == "x?")[2])
     page.fill("input[aria-label='Project name']", "Unsaved test")
     page.keyboard.press("Tab")
 

@@ -318,7 +318,7 @@ Decision gates, in order:
 - [x] Target Mac: decided Nov 10, 8GB Apple Silicon. The budget table is set for it.
 - [ ] Captions: V1.5 with local whisper.cpp, or later. Only the reserved track type is in V1.
 - [ ] Business Studio catalogue: how many products and whether they are shared with a shop system. This decides whether M8 needs SQLite.
-- [ ] Code signing: notarisation needs a paid Apple Developer account ($99 a year). With no expenses, V1 ships unsigned and is opened once with right-click, Open. Confirm before M7.
+- [x] Code signing: notarisation needs a paid Apple Developer account ($99 a year). With no expenses, V1 ships unsigned and is opened once through System Settings, Privacy & Security, Open Anyway. Confirmed with the user at M7.
 
 **Reference projects**, read for their approach, not forked:
 

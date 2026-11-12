@@ -146,6 +146,7 @@ export class MediaService {
 
   private async pump(): Promise<void> {
     if (this.busy || this.paused) return;
+    if (this.idleTimer) clearTimeout(this.idleTimer);
     const item = this.queue.shift();
     if (!item) {
       this.idleTimer = setTimeout(() => this.closeWorker(), IDLE_CLOSE_MS);

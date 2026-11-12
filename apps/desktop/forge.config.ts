@@ -9,7 +9,7 @@ const config = {
     appCategoryType: "public.app-category.video",
     icon: "assets/icon", // assets/icon.icns, drawn by assets/make-icon.py
     // V1 is not signed with a Developer ID and not notarised (no paid Apple Developer account). scripts/make-dmg.sh gives the
-    // app an ad-hoc signature, which Apple Silicon needs to run it; the first launch is right-click, Open.
+    // app an ad-hoc signature, which Apple Silicon needs to run it; the first launch goes through System Settings, Privacy & Security, Open Anyway.
   },
   rebuildConfig: {},
   plugins: [

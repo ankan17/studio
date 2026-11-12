@@ -11,7 +11,7 @@ The spike repo is `ankan17/studio-spike`; its findings are copied into `docs/`.
 - No separate colour-normalise step: the proxy step converts HDR to SDR. Send HEVC 10-bit and HDR sources through the proxy queue even at 1080p30.
 - Transitions: non-shader only (fade, slide, wipe); `dissolve()` needs Chrome 149+, Electron here ships 148.
 - `<Video>` from `@remotion/media` needs an explicit width and height, or portrait clips are cropped.
-- Editor Starter is not bought; we build from the Remotion Electron template. Unsigned builds for V1 (confirmed at M7: ad-hoc signature, opened once with right-click, Open).
+- Editor Starter is not bought; we build from the Remotion Electron template. Unsigned builds for V1 (confirmed at M7: ad-hoc signature, opened once via System Settings, Privacy & Security, Open Anyway).
 
 Full figures and caveats: `docs/spike-results.md`, `docs/spike-decisions.md`.
 
@@ -24,12 +24,12 @@ Full figures and caveats: `docs/spike-results.md`, `docs/spike-decisions.md`.
 
 ## Run
 ```
-pnpm release             # M7: package the app and build apps/desktop/out/Studio-<version>-arm64.dmg (see docs/release-checklist.md)
 pnpm install            # needs the @electron/node-gyp override in pnpm-workspace.yaml; the esbuild ignored-builds warning is harmless
 pnpm dev                # electron-forge start in apps/desktop; keep stdin open when scripting: npx electron-forge start < <(sleep 1700)
 pnpm typecheck
 pnpm lint
 pnpm test                # schema tests, store tests, and a SIGKILL-mid-save crash test
+pnpm release             # M7: package the app and build apps/desktop/out/Studio-<version>-arm64.dmg (see docs/release-checklist.md)
 ```
 
 ## Security lessons (from the spike review) and where they are applied
@@ -45,7 +45,7 @@ pnpm test                # schema tests, store tests, and a SIGKILL-mid-save cra
 - Keep `backgroundThrottling: false` on editor and worker windows.
 - Do not add `remotion` to Vite `optimizeDeps.include`; do pre-include `@remotion/transitions` and `@remotion/fonts`, and set `resolve.dedupe` for react.
 - Fonts: Noto Sans Bengali and Bebas Neue (SIL OFL) are in the spike repo `spike/fonts/`.
-- Packaging (`pnpm release`): keep the `yauzl` override in the root `package.json` (without it `electron-forge package` exits silently on Node 24) and the explicit `public-hoist-pattern` in `.npmrc` (Forge refuses to package under pnpm without one). Overrides in `pnpm-workspace.yaml` are ignored by pnpm 10.0.0.
+- Packaging (`pnpm release`): keep the `yauzl` override in the root `package.json` (without it `electron-forge package` exits silently on Node 24) and the explicit `public-hoist-pattern` in `.npmrc` (Forge refuses to package under pnpm without one). Overrides in `pnpm-workspace.yaml` (including the `@electron/node-gyp` one) are ignored by pnpm 10.0.0, the pinned version; a newer global pnpm (11) ignores the `pnpm` field in package.json instead, so run the pinned one (corepack) when packaging.
 - Memory bars apply to the 8GB Mac: editor tab under 600MB, total under 1.2GB, export peak under 1.5GB.
 
 ## Verifying a milestone
