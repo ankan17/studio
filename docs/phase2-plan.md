@@ -232,7 +232,7 @@ Each look is a generator recipe, applied to Rec.709 footage in display (gamma-en
 5. **Skin protect** *k* (0 to 1): for hues 10° to 50° with saturation 0.15 to 0.6 (10° soft edge), blend back toward the colour after step 2 by *k*, so faces do not go orange or grey.
 6. Clamp, write a 33³ `.cube`.
 
-Each look also has a **hue-preserving variant** (`<id>-true`), generated from the same recipe with steps 1 and 4 skipped and saturation capped at 1.0, so only contrast changes. Showcase uses it; anyone can pick it by hand. Its check is a colour chart frame whose patches keep their hue within 2°.
+Each look also has a **hue-preserving variant** (`<id>-true`), generated from the same recipe with steps 1 and 4 skipped, saturation capped at 1.0, and the tone curve applied to each colour's largest and smallest channel with the middle one placed by its original ratio, so only contrast changes (a per-channel curve shifts hue by up to 3.4° on a colour chart; see S1 in `docs/phase2-spike-results.md`). Showcase uses it; anyone can pick it by hand. Its check is a colour chart frame whose patches keep their hue within 2°.
 
 The clip's `intensity` mixes the original and the graded picture in the shader. Values are starting points; M11 may tune them against real footage, and the style files record the final numbers.
 

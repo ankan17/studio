@@ -5,6 +5,7 @@
 import {graphemes, pictureLayout, textAnimation, transitionLook, transitionSpans, type Asset, type Clip, type Project, type Span, type Track, type TransitionKind} from "@studio/schema";
 import {Audio, Video} from "@remotion/media";
 import {memo, useMemo} from "react";
+import {lutLook} from "./lut-effect";
 import {AbsoluteFill, Img, Sequence, useCurrentFrame} from "remotion";
 
 export type EngineProps = {
@@ -66,6 +67,12 @@ function TransitionFx({clip, span, children}: {clip: Clip; span: SpanProps; chil
 
 type LayerProps = {clip: Clip; asset: Asset; src: string; fps: number; muted: boolean; width: number; height: number; soundOnly: boolean} & SpanProps;
 
+// Spike S1 only: one look on every video layer. window.studioSpikeLook = null turns it off for a baseline.
+const spikeLook = (): {lutId: string; intensity: number} | null => {
+  const w = globalThis as {studioSpikeLook?: {lutId: string; intensity: number} | null};
+  return w.studioSpikeLook === undefined ? {lutId: "teal-orange", intensity: 0.7} : w.studioSpikeLook;
+};
+
 const MediaLayer = memo(function MediaLayer({clip, asset, src, fps, muted, width, height, soundOnly, ...span}: LayerProps) {
   const premountFor = Math.round(PREMOUNT_SECONDS * fps);
   // a transition into this clip starts it early, on source before its in point
@@ -83,10 +90,11 @@ const MediaLayer = memo(function MediaLayer({clip, asset, src, fps, muted, width
   // A crop shows part of the media: a box the size of the kept part, with the whole media placed under it.
   const crop = clip.crop && asset.width && asset.height ? pictureLayout(clip, asset, width, height) : null;
   const fit = crop ? "fill" : clip.fit;
+  const look = spikeLook();
   const size = crop ? ({position: "absolute", left: crop.mediaX, top: crop.mediaY, width: crop.mediaW, height: crop.mediaH} as const) : fill;
   const media =
     asset.type === "video" ? (
-      <Video src={src} trimBefore={trimBefore} playbackRate={clip.speed} volume={volumeFn(clip, muted, span)} objectFit={fit} style={size} />
+      <Video src={src} trimBefore={trimBefore} playbackRate={clip.speed} volume={volumeFn(clip, muted, span)} objectFit={fit} style={size} effects={look ? [lutLook(look)] : []} />
     ) : (
       <Img src={src} style={{...size, objectFit: fit}} />
     );

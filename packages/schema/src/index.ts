@@ -126,3 +126,4 @@ export type Fps = Project["fps"];
 export const createProject = (id: string, name: string, format: {width: number; height: number; fps: Fps}): Project =>
   ProjectSchema.parse({schemaVersion: SCHEMA_VERSION, id, name, ...format});
 export * from "./timeline";
+export * from "./lut";
