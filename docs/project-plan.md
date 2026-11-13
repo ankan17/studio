@@ -6,7 +6,7 @@ Nov 10, 2026 · @Ankan
 
 ## Summary
 
-Studio is a local-first, CapCut-style desktop video editor built on Remotion, targeted at two users first: a YouTube vlog channel and a saree business. It is not an agentic editor. Every edit is made by hand on a timeline, in an inspector or on the preview canvas. No chat, no AI agent, no generated video in V1.
+Studio is a local-first, CapCut-style desktop video editor built on Remotion, targeted at two users first: a YouTube vlog channel and a saree business. V1 is not an agentic editor. Every edit is made by hand on a timeline, in an inspector or on the preview canvas. No chat, no AI agent, no generated video in V1. Automatic reels (Phase 2, `docs/phase2-plan.md`) and a chat editor (Phase 3, `docs/phase3-plan.md`) come after V1, as an optional layer on the user's own API key.
 
 The command-based editing core keeps the door open. Each timeline operation is a typed command with an inverse, which is exactly the shape an agent would call as a tool. If an agent layer is wanted later, it is an adapter over the command bus, not a rewrite. Auto captions are the one AI-adjacent feature creators will ask for; the schema reserves a caption track type so it can land in V1.5 without a migration.
 
@@ -36,7 +36,10 @@ V1 is done when one person can take 10 phone-recorded clips, cut a 2 to 3 minute
 - Transitions: cut, fade, dissolve between adjacent clips (spike 5: the shader dissolve needs Chrome 149 and Electron has 148, so V1 uses the non-shader cross-fade and true dissolve waits for a newer Electron)
 - Preview: Remotion Player, play, seek, frame step, canvas drag to position, aspect ratios 16:9, 9:16, 4:5, 1:1
 - Export: MP4 H.264 with AAC at 720p or 1080p, 24, 25, 30 or 60 fps, progress and cancel
-- Business Studio: product record, brand kit, three promotional templates with auto-filled title, price and brand
+
+**Moved out of V1** (Nov 14, 2026, with the Phase 2 plan, `docs/phase2-plan.md`, which decides where it lands)
+
+- Business Studio (M8): product record, brand kit, three promotional templates with auto-filled title, price and brand
 
 **Out of V1, schema-ready**
 
@@ -45,9 +48,13 @@ V1 is done when one person can take 10 phone-recorded clips, cut a 2 to 3 minute
 - Link-instead-of-copy media import
 - Windows build (code stays cross-platform, only macOS is tested and signed)
 
+**Moved to Phase 2** (Nov 14, 2026)
+
+- Colour grading with LUTs (`docs/phase2-plan.md`)
+
 **Out, not planned**
 
-- Colour grading, multicam, green screen, AI-generated video, collaboration, cloud rendering, direct publishing, mobile
+- Multicam, green screen, AI-generated video, collaboration, cloud rendering, direct publishing, mobile
 
 ## Architecture
 
@@ -180,8 +187,8 @@ Order of work:
 8. M6 Export
 9. Gate 2: real vlog exported
 10. M7 Reliability and release
-11. V1 creator release
-12. M8 Business Studio
+11. V1 creator release, version 1.0.0
+12. M8 Business Studio (moved after V1; see `docs/phase2-plan.md`)
 
 Gate 1 is the first vertical slice from the original spec: create, import, preview, save, reopen. Gate 2 is the acceptance test run by the actual user on their own footage. Nothing after a gate starts until it passes.
 
@@ -279,6 +286,8 @@ Exit: V1 installed on the user's Mac and used for a published video.
 **Status: built and verified on the dev Mac** (`docs/reports/M7.md`). Decided with the user before building: a manual update check (no auto-update, which needs a signed app), local-only crash reporting (log file, local minidumps, a Report a Problem dialog that copies details), unsigned with an ad-hoc signature, and the acceptance scenarios as a checklist with what can be automated automated. Reliability: a force-quit mid-edit is detected on the next start (session lock) and the dashboard offers the project edited last; a failed save is retried every 5 seconds with a banner that says why, and leaving or closing with an unsaved failure asks first; a missing file is named in a banner and in the export error, including one lost mid-export; a full disk is caught before an export starts and explained in plain words on import, save and export (tested on a real 1.5GB disk image). Also: `?` shortcut sheet, first-run steps on an empty project, a log with local crash dumps, the media queue pausing while an export runs, a production CSP without localhost. Still to run by hand on the 8GB Mac with real footage: Gate 2 (5-minute export, sync, the 1.5GB peak), the memory bars, and the checklist's hand column. The exit (installed and used for a published video) is the user's.
 
 ### M8 Business Studio
+
+Moved out of V1 on Nov 14, 2026. It keeps its number; when it is built is decided in `docs/phase2-plan.md`.
 
 - [ ] Product record and brand kit with logo, colours and fonts
 - [ ] Three templates: product reel 9:16, collection showcase 16:9, price card 4:5

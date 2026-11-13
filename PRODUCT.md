@@ -18,7 +18,7 @@ Studio is a desktop video editor that stays usable on an 8GB Apple Silicon Mac: 
 
 ## Positioning
 
-Local, project-folder editor with no subscription. The preview and the export use the same composition, so what plays is what exports. Work is autosaved, with crash-safe atomic saves and recovery copies. Built to stay within memory limits on an 8GB Mac (editor tab under 600MB, total under 1.2GB, export peak under 1.5GB).
+Local, project-folder editor with no subscription. AI features (automatic reels, from Phase 2) are optional and use your own key; without one the app works fully. The preview and the export use the same composition, so what plays is what exports. Work is autosaved, with crash-safe atomic saves and recovery copies. Built to stay within memory limits on an 8GB Mac (editor tab under 600MB, total under 1.2GB, export peak under 1.5GB).
 
 ## Operating Context
 
